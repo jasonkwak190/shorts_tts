@@ -11,7 +11,10 @@
       "Bash(npm run dev:*)",
       "Bash(grep:*)",
       "Bash(curl:*)",
-      "Bash(rg:*)"
+      "Bash(rg:*)",
+      "Bash(npm run build:*)",
+      "Bash(pkill:*)",
+      "mcp__ide__getDiagnostics"
     ],
     "deny": []
   }

@@ -14,7 +14,7 @@ interface Segment {
   isThumbnail?: boolean;
   order?: number;
   backgroundImageUrl?: string;
-  imagePosition?: { x: number; y: number; scale: number };
+  imagePosition?: { x: number; y: number; scale: number; width?: number; height?: number };
   textColor?: string;
   textSize?: number;
 }
@@ -89,7 +89,7 @@ const AudioPlayer = ({ audioUrl, onDurationLoad }: { audioUrl: string, onDuratio
             style={{ width: `${duration ? (currentTime / duration) * 100 : 0}%` }}
           ></div>
         </div>
-        <span className="text-xs text-gray-600 min-w-[60px]">
+        <span className="text-xs text-black min-w-[60px]">
           {formatTime(currentTime)} / {formatTime(duration)}
         </span>
       </div>
@@ -102,9 +102,7 @@ export default function Home() {
   const [script, setScript] = useState("");
   const [isGenerating, setIsGenerating] = useState(false);
   const [segments, setSegments] = useState<Segment[]>([]);
-  const [showSegments, setShowSegments] = useState(false);
   const [selectedVoice, setSelectedVoice] = useState("female1");
-  const [showImageUpload, setShowImageUpload] = useState(false);
   const [globalBackgroundImage, setGlobalBackgroundImage] = useState<string>("");
   const [globalBackgroundImageName, setGlobalBackgroundImageName] = useState<string>("");
   const [pendingTextChanges, setPendingTextChanges] = useState<{[key: string]: string}>({});
@@ -112,17 +110,21 @@ export default function Home() {
   const [thumbnailPosition, setThumbnailPosition] = useState<{x: number; y: number}>({x: 50, y: 30});
   const [thumbnailImage, setThumbnailImage] = useState<string>("");
   const [thumbnailImageName, setThumbnailImageName] = useState<string>("");
-  const [thumbnailImagePosition, setThumbnailImagePosition] = useState<{x: number; y: number; scale: number}>({x: 50, y: 50, scale: 1});
+  const [thumbnailImagePosition, setThumbnailImagePosition] = useState<{x: number; y: number; scale: number}>({x: 50, y: 50, scale: 2.0});
   const [showThumbnailText, setShowThumbnailText] = useState<boolean>(true);
   const [thumbnailDuration, setThumbnailDuration] = useState<number>(1);
   const [thumbnailTextColor, setThumbnailTextColor] = useState<string>('#ffffff');
-  const [thumbnailTextSize, setThumbnailTextSize] = useState<number>(32);
+  const [thumbnailTextSize, setThumbnailTextSize] = useState<number>(60); // 더 큰 기본 크기로 변경
   const [selectedSegmentId, setSelectedSegmentId] = useState<string | null>(null); // 선택된 세그먼트
   const [isGeneratingVideo, setIsGeneratingVideo] = useState<boolean>(false);
+  const [editingImageId, setEditingImageId] = useState<string | null>(null); // 편집 중인 이미지 ID
   const [videoResult, setVideoResult] = useState<string>("");
   const [currentStep, setCurrentStep] = useState<number>(1); // 1: 스크립트, 2: TTS, 3: 이미지, 4: 비디오
   const [completionNotifications, setCompletionNotifications] = useState<string[]>([]); // TTS 완료 알림
   const [applyToAllSegments, setApplyToAllSegments] = useState<boolean>(false); // 전체 세그먼트에 텍스트 설정 적용
+
+  // 실제 캔버스와 미리보기 크기 비율
+  const PREVIEW_SCALE = 0.5; // 미리보기는 실제 크기의 50% (540/1080 = 0.5)
 
   // 세그먼트가 생성되면 첫 번째 세그먼트 자동 선택
   useEffect(() => {
@@ -158,7 +160,7 @@ export default function Home() {
     }
   };
 
-  const generateTTSForSegment = async (segmentId: string, text: string, voice: string) => {
+  const generateTTSForSegment = async (segmentId: string, _text: string, _voice: string) => {
     setSegments(prev => prev.map(s => 
       s.id === segmentId ? { ...s, isGenerating: true } : s
     ));
@@ -209,15 +211,26 @@ export default function Home() {
     const reader = new FileReader();
     reader.onload = (e) => {
       const imageUrl = e.target?.result as string;
-      setSegments(prev => prev.map(s => 
-        s.id === segmentId ? { 
-          ...s, 
-          imageUrl,
-          imageName: file.name,
-          subtitlePosition: { x: 50, y: 80 }, // 기본 위치 (중앙 하단)
-          imagePosition: { x: 50, y: 50, scale: 1.5 } // 기본 크기 1.5배
-        } : s
-      ));
+      
+      // 이미지 로드해서 자동으로 가로폭에 맞는 스케일 계산
+      const img = new Image();
+      img.onload = () => {
+        // 유튜브 쇼츠 가로폭 1080px에 맞게 자동 스케일 계산
+        const videoWidth = 1080;
+        const baseImageWidth = 600; // Canvas 기본 이미지 크기
+        const autoScale = videoWidth / baseImageWidth; // 1080 / 600 = 1.8
+        
+        setSegments(prev => prev.map(s => 
+          s.id === segmentId ? { 
+            ...s, 
+            imageUrl,
+            imageName: file.name,
+            subtitlePosition: { x: 50, y: 80 }, // 기본 위치 (중앙 하단)
+            imagePosition: { x: 50, y: 50, scale: autoScale } // 자동으로 가로폭 꽉 채우는 스케일
+          } : s
+        ));
+      };
+      img.src = imageUrl;
     };
     reader.readAsDataURL(file);
   };
@@ -232,15 +245,25 @@ export default function Home() {
         const reader = new FileReader();
         reader.onload = (e) => {
           const imageUrl = e.target?.result as string;
-          setSegments(prev => prev.map(s => 
-            s.id === targetSegment.id ? { 
-              ...s, 
-              imageUrl,
-              imageName: file.name,
-              subtitlePosition: { x: 50, y: 80 },
-              imagePosition: { x: 50, y: 50, scale: 1.5 } // 기본 크기 1.5배
-            } : s
-          ));
+          
+          // 자동 스케일 계산
+          const img = new Image();
+          img.onload = () => {
+            const videoWidth = 1080;
+            const baseImageWidth = 600;
+            const autoScale = videoWidth / baseImageWidth; // 1.8
+            
+            setSegments(prev => prev.map(s => 
+              s.id === targetSegment.id ? { 
+                ...s, 
+                imageUrl,
+                imageName: file.name,
+                subtitlePosition: { x: 50, y: 80 },
+                imagePosition: { x: 50, y: 50, scale: autoScale } // 자동으로 가로폭 꽉 채우는 스케일
+              } : s
+            ));
+          };
+          img.src = imageUrl;
         };
         reader.readAsDataURL(file);
       }
@@ -426,44 +449,43 @@ export default function Home() {
         if (time < thumbnailDuration) {
           // 썸네일 이미지 (미리보기와 완전히 동일한 비율과 위치)
           if (thumbnailImg) {
-            // 미리보기 640px 높이 → 캔버스 1920px 높이 비율 정확히 계산
-            const previewHeight = 640;
-            const canvasHeight = 1920;
-            const scaleFactor = canvasHeight / previewHeight;
+            // 더 큰 기본 크기 설정 (화면을 더 잘 채우도록)
+            const baseWidth = 600; // 기본 크기를 2배로 증가
+            const baseHeight = 400; // 기본 크기를 2배로 증가
             
-            // 미리보기와 동일한 크기 (150x100)를 비율에 맞춰 확대
-            const imgWidth = 150 * scaleFactor;
-            const imgHeight = 100 * scaleFactor;
+            // CSS transform: scale() 동작 모방 - 중앙점 기준 스케일링
+            const scale = thumbnailImagePosition.scale;
+            const scaledWidth = baseWidth * scale;
+            const scaledHeight = baseHeight * scale;
             
-            // 미리보기와 동일한 위치 계산
-            const x = (canvas.width * thumbnailImagePosition.x / 100) - imgWidth/2;
-            const y = (canvas.height * thumbnailImagePosition.y / 100) - imgHeight/2;
+            // 미리보기와 동일한 위치 계산 (percentage를 pixel로 변환)
+            const centerX = canvas.width * thumbnailImagePosition.x / 100;
+            const centerY = canvas.height * thumbnailImagePosition.y / 100;
             
-            // 고품질 이미지 렌더링 (지주함 방지, 비율 유지)
+            // 고품질 이미지 렌더링
             ctx.imageSmoothingEnabled = true;
             ctx.imageSmoothingQuality = 'high';
             
-            // 원본 비율 유지하면서 그리기
+            // 원본 비율 유지하면서 전체 이미지가 보이도록 (contain 방식)
             const aspectRatio = thumbnailImg.naturalWidth / thumbnailImg.naturalHeight;
-            const targetWidth = imgWidth * thumbnailImagePosition.scale;
-            const targetHeight = imgHeight * thumbnailImagePosition.scale;
+            const baseAspectRatio = scaledWidth / scaledHeight;
             
-            // 비율 유지를 위한 크기 조정
-            let finalWidth = targetWidth;
-            let finalHeight = targetHeight;
+            let finalWidth = scaledWidth;
+            let finalHeight = scaledHeight;
             
-            if (aspectRatio > (targetWidth / targetHeight)) {
-              // 가로가 더 긴 경우
-              finalHeight = targetWidth / aspectRatio;
+            if (aspectRatio > baseAspectRatio) {
+              // 이미지가 더 가로로 긴 경우 - 가로 기준으로 맞춤
+              finalHeight = finalWidth / aspectRatio;
             } else {
-              // 세로가 더 긴 경우
-              finalWidth = targetHeight * aspectRatio;
+              // 이미지가 더 세로로 긴 경우 - 세로 기준으로 맞춤  
+              finalWidth = finalHeight * aspectRatio;
             }
             
+            // CSS transform과 동일한 중앙 기준 위치 계산
             ctx.drawImage(
               thumbnailImg, 
-              x - finalWidth/2, 
-              y - finalHeight/2, 
+              centerX - finalWidth/2, 
+              centerY - finalHeight/2, 
               finalWidth, 
               finalHeight
             );
@@ -471,17 +493,40 @@ export default function Home() {
 
           // 썸네일 텍스트 (사용자 정의 스타일 적용)
           if (showThumbnailText) {
-            ctx.fillStyle = thumbnailTextColor;
+            ctx.save(); // 컨텍스트 상태 저장
+            ctx.globalAlpha = 1.0; // 투명도 완전 불투명
+            ctx.fillStyle = thumbnailTextColor || '#ffffff';
+            ctx.strokeStyle = '#000000'; // 검은색 외곽선
+            ctx.lineWidth = 4; // 외곽선 두께
             ctx.font = `bold ${thumbnailTextSize}px Arial`;
-            ctx.textAlign = 'center';
-            ctx.shadowColor = 'black';
-            ctx.shadowBlur = 4;
-            ctx.shadowOffsetX = 2;
-            ctx.shadowOffsetY = 2;
             
-            const x = canvas.width * thumbnailPosition.x / 100;
-            const y = canvas.height * thumbnailPosition.y / 100;
+            // 🚀 새로운 방법: 텍스트 크기 직접 측정해서 수동 중앙 정렬
+            const textMetrics = ctx.measureText(thumbnailText);
+            const textWidth = textMetrics.width;
+            const textHeight = thumbnailTextSize; // 대략적인 높이
+            
+            // 위치 계산: CSS처럼 정확히 중앙에 배치
+            const centerX = canvas.width * thumbnailPosition.x / 100;
+            const centerY = canvas.height * thumbnailPosition.y / 100;
+            
+            // 텍스트를 정확히 중앙에 배치하기 위한 좌표
+            const x = centerX - (textWidth / 2);  // 왼쪽에서 시작
+            const y = centerY + (textHeight / 3); // 베이스라인 조정
+            
+            // 디버깅 선 제거됨 - 깔끔한 렌더링
+            
+            // 🎯 수동 정렬 설정
+            ctx.textAlign = 'left';    // 왼쪽부터 시작
+            ctx.textBaseline = 'top';  // 위쪽부터 시작
+            
+            // 외곽선 먼저 그리기
+            ctx.strokeStyle = '#000000';
+            ctx.fillStyle = thumbnailTextColor || '#ffffff';
+            ctx.strokeText(thumbnailText, x, y);
+            // 그 다음 채우기
             ctx.fillText(thumbnailText, x, y);
+            
+            ctx.restore(); // 컨텍스트 상태 복원
           }
         } 
         // 세그먼트 단계
@@ -504,103 +549,138 @@ export default function Home() {
             
             // 썸네일 텍스트 (사용자 정의 스타일 적용)
             if (showThumbnailText) {
-              ctx.fillStyle = thumbnailTextColor;
+              ctx.save(); // 컨텍스트 상태 저장
+              ctx.globalAlpha = 1.0; // 투명도 완전 불투명
+              ctx.fillStyle = thumbnailTextColor || '#ffffff';
+              ctx.strokeStyle = '#000000'; // 검은색 외곽선
+              ctx.lineWidth = 4; // 외곽선 두께
               ctx.font = `bold ${thumbnailTextSize}px Arial`;
-              ctx.textAlign = 'center';
-              ctx.shadowColor = 'black';
-              ctx.shadowBlur = 4;
-              ctx.shadowOffsetX = 2;
-              ctx.shadowOffsetY = 2;
               
-              const x = canvas.width * thumbnailPosition.x / 100;
-              const y = canvas.height * thumbnailPosition.y / 100;
+              // 🚀 두 번째 썸네일도 수동 정렬
+              const textMetrics = ctx.measureText(thumbnailText);
+              const textWidth = textMetrics.width;
+              const textHeight = thumbnailTextSize;
+              
+              const centerX = canvas.width * thumbnailPosition.x / 100;
+              const centerY = canvas.height * thumbnailPosition.y / 100;
+              
+              const x = centerX - (textWidth / 2);
+              const y = centerY + (textHeight / 3);
+              
+              ctx.textAlign = 'left';
+              ctx.textBaseline = 'top';
+              
+              // 외곽선 먼저 그리기
+              ctx.strokeText(thumbnailText, x, y);
+              // 그 다음 채우기
               ctx.fillText(thumbnailText, x, y);
+              
+              ctx.restore(); // 컨텍스트 상태 복원
             }
 
             // 세그먼트 이미지 (미리보기와 완전히 동일한 비율과 위치)
             const segmentImg = segmentImages[currentSegmentIndex];
             if (segmentImg) {
-              // 미리보기 640px 높이 → 캔버스 1920px 높이 비율 정확히 계산
-              const previewHeight = 640;
-              const canvasHeight = 1920;
-              const scaleFactor = canvasHeight / previewHeight;
+              // 더 큰 기본 크기 설정 (화면을 더 잘 채우도록)
+              const baseWidth = 600; // 기본 크기를 2배로 증가
+              const baseHeight = 400; // 기본 크기를 2배로 증가
               
-              // 미리보기와 동일한 크기 (150x100)를 비율에 맞춰 확대
-              const imgWidth = 150 * scaleFactor;
-              const imgHeight = 100 * scaleFactor;
+              // CSS transform: scale() 동작 모방 - 중앙점 기준 스케일링
+              const scale = segment.imagePosition?.scale || 1;
+              const scaledWidth = baseWidth * scale;
+              const scaledHeight = baseHeight * scale;
               
-              // 미리보기와 동일한 위치 계산
-              const imgX = (canvas.width * (segment.imagePosition?.x || 50) / 100) - imgWidth/2;
-              const imgY = (canvas.height * (segment.imagePosition?.y || 50) / 100) - imgHeight/2;
+              // 미리보기와 동일한 위치 계산 (percentage를 pixel로 변환)
+              const centerX = canvas.width * (segment.imagePosition?.x || 50) / 100;
+              const centerY = canvas.height * (segment.imagePosition?.y || 50) / 100;
               
-              // 고품질 이미지 렌더링 (지주함 방지, 비율 유지)
+              // 고품질 이미지 렌더링
               ctx.imageSmoothingEnabled = true;
               ctx.imageSmoothingQuality = 'high';
               
-              // 원본 비율 유지하면서 그리기
+              // 원본 비율 유지하면서 전체 이미지가 보이도록 (contain 방식)
               const aspectRatio = segmentImg.naturalWidth / segmentImg.naturalHeight;
-              const targetWidth = imgWidth * (segment.imagePosition?.scale || 1);
-              const targetHeight = imgHeight * (segment.imagePosition?.scale || 1);
+              const baseAspectRatio = scaledWidth / scaledHeight;
               
-              // 비율 유지를 위한 크기 조정
-              let finalWidth = targetWidth;
-              let finalHeight = targetHeight;
+              let finalWidth = scaledWidth;
+              let finalHeight = scaledHeight;
               
-              if (aspectRatio > (targetWidth / targetHeight)) {
-                // 가로가 더 긴 경우
-                finalHeight = targetWidth / aspectRatio;
+              if (aspectRatio > baseAspectRatio) {
+                // 이미지가 더 가로로 긴 경우 - 가로 기준으로 맞춤
+                finalHeight = finalWidth / aspectRatio;
               } else {
-                // 세로가 더 긴 경우
-                finalWidth = targetHeight * aspectRatio;
+                // 이미지가 더 세로로 긴 경우 - 세로 기준으로 맞춤  
+                finalWidth = finalHeight * aspectRatio;
               }
               
+              // CSS transform과 동일한 중앙 기준 위치 계산
               ctx.drawImage(
                 segmentImg, 
-                imgX - finalWidth/2, 
-                imgY - finalHeight/2, 
+                centerX - finalWidth/2, 
+                centerY - finalHeight/2, 
                 finalWidth, 
                 finalHeight
               );
             }
 
             // 세그먼트 자막 (사용자 정의 스타일 적용)
-            ctx.fillStyle = segment.textColor || 'white';
+            ctx.save(); // 컨텍스트 상태 저장
+            ctx.globalAlpha = 1.0; // 투명도 완전 불투명
+            ctx.fillStyle = segment.textColor || '#ffffff';
+            ctx.strokeStyle = '#000000'; // 검은색 외곽선
+            ctx.lineWidth = 3; // 외곽선 두께
+            
             // 미리보기 → 캔버스 비율 정확히 맞춤
-            const previewHeight = 640;
-            const canvasHeight = 1920;
-            const baseFontSize = segment.textSize || 24;
-            const fontSize = Math.round(baseFontSize * (canvasHeight / previewHeight));
+            const baseFontSize = segment.textSize || 36; // 더 큰 기본 크기
+            const fontSize = Math.round(baseFontSize); // Canvas는 실제 크기 사용
             ctx.font = `bold ${fontSize}px Arial`;
-            ctx.textAlign = 'center';
-            ctx.shadowColor = 'black';
-            ctx.shadowBlur = 4;
-            ctx.shadowOffsetX = 2;
-            ctx.shadowOffsetY = 2;
+            
+            // 🚀 세그먼트 텍스트도 수동 정렬
+            ctx.textAlign = 'left';
+            ctx.textBaseline = 'top';
             
             // 미리보기와 동일한 위치 계산
-            const subtitleX = canvas.width * (segment.subtitlePosition?.x || 50) / 100;
-            const subtitleY = canvas.height * (segment.subtitlePosition?.y || 75) / 100;
+            const centerX = canvas.width * (segment.subtitlePosition?.x || 50) / 100;
+            const centerY = canvas.height * (segment.subtitlePosition?.y || 75) / 100;
             
-            // 긴 텍스트 줄바꿈 처리
+            // 🎯 새로운 줄바꿈 + 중앙 정렬 처리
             const words = segment.text.split(' ');
-            let line = '';
-            let lineY = subtitleY;
+            const lines = [];
+            let currentLine = '';
             
+            // 먼저 모든 줄을 계산
             for (let n = 0; n < words.length; n++) {
-              const testLine = line + words[n] + ' ';
+              const testLine = currentLine + words[n] + ' ';
               const metrics = ctx.measureText(testLine);
-              const testWidth = metrics.width;
               
-              if (testWidth > canvas.width * 0.8 && n > 0) {
-                ctx.fillText(line, subtitleX, lineY);
-                line = words[n] + ' ';
-                // 줄 간격도 비율에 맞춰 조정
-                lineY += Math.round(30 * (canvasHeight / previewHeight));
+              if (metrics.width > canvas.width * 0.8 && n > 0) {
+                lines.push(currentLine.trim());
+                currentLine = words[n] + ' ';
               } else {
-                line = testLine;
+                currentLine = testLine;
               }
             }
-            ctx.fillText(line, subtitleX, lineY);
+            if (currentLine.trim()) {
+              lines.push(currentLine.trim());
+            }
+            
+            // 각 줄을 중앙에 정렬해서 그리기
+            const lineHeight = 40;
+            const totalHeight = lines.length * lineHeight;
+            const startY = centerY - (totalHeight / 2);
+            
+            lines.forEach((line, index) => {
+              const lineMetrics = ctx.measureText(line);
+              const lineX = centerX - (lineMetrics.width / 2);
+              const lineY = startY + (index * lineHeight);
+              
+              // 외곽선 먼저 그리기
+              ctx.strokeText(line, lineX, lineY);
+              // 그 다음 채우기
+              ctx.fillText(line, lineX, lineY);
+            });
+            
+            ctx.restore(); // 컨텍스트 상태 복원
           }
         }
       };
@@ -641,48 +721,48 @@ export default function Home() {
   return (
     <div className="min-h-screen bg-gray-50 py-8">
       <div className="max-w-6xl mx-auto px-4">
-        <h1 className="text-3xl font-bold text-center mb-8">YouTube Shorts 생성기</h1>
+        <h1 className="text-3xl font-bold text-center mb-8 text-black">YouTube Shorts 생성기</h1>
         
         {/* 단계 표시 */}
         <div className="flex justify-center mb-8">
           <div className="flex items-center space-x-4">
             <div className={`flex items-center space-x-2 px-3 py-2 rounded-lg ${
               currentStep === 1 ? 'bg-blue-600 text-white' : 
-              currentStep > 1 ? 'bg-green-600 text-white' : 'bg-gray-200 text-gray-600'
+              currentStep > 1 ? 'bg-green-600 text-white' : 'bg-gray-200 text-black'
             }`}>
               <span className="w-5 h-5 rounded-full bg-white text-blue-600 flex items-center justify-center text-xs font-bold">
                 {currentStep > 1 ? '✓' : '1'}
               </span>
-              <span className="font-medium text-sm">스크립트</span>
+              <span className="font-medium text-sm text-black">스크립트</span>
             </div>
             <div className="w-6 h-1 bg-gray-300"></div>
             <div className={`flex items-center space-x-2 px-3 py-2 rounded-lg ${
               currentStep === 2 ? 'bg-blue-600 text-white' : 
-              currentStep > 2 ? 'bg-green-600 text-white' : 'bg-gray-200 text-gray-600'
+              currentStep > 2 ? 'bg-green-600 text-white' : 'bg-gray-200 text-black'
             }`}>
               <span className="w-5 h-5 rounded-full bg-white text-blue-600 flex items-center justify-center text-xs font-bold">
                 {currentStep > 2 ? '✓' : '2'}
               </span>
-              <span className="font-medium text-sm">TTS</span>
+              <span className="font-medium text-sm text-black">TTS</span>
             </div>
             <div className="w-6 h-1 bg-gray-300"></div>
             <div className={`flex items-center space-x-2 px-3 py-2 rounded-lg ${
               currentStep === 3 ? 'bg-blue-600 text-white' : 
-              currentStep > 3 ? 'bg-green-600 text-white' : 'bg-gray-200 text-gray-600'
+              currentStep > 3 ? 'bg-green-600 text-white' : 'bg-gray-200 text-black'
             }`}>
               <span className="w-5 h-5 rounded-full bg-white text-blue-600 flex items-center justify-center text-xs font-bold">
                 {currentStep > 3 ? '✓' : '3'}
               </span>
-              <span className="font-medium text-sm">이미지</span>
+              <span className="font-medium text-sm text-black">이미지</span>
             </div>
             <div className="w-6 h-1 bg-gray-300"></div>
             <div className={`flex items-center space-x-2 px-3 py-2 rounded-lg ${
-              currentStep === 4 ? 'bg-blue-600 text-white' : 'bg-gray-200 text-gray-600'
+              currentStep === 4 ? 'bg-blue-600 text-white' : 'bg-gray-200 text-black'
             }`}>
               <span className="w-5 h-5 rounded-full bg-white text-blue-600 flex items-center justify-center text-xs font-bold">
                 4
               </span>
-              <span className="font-medium text-sm">비디오</span>
+              <span className="font-medium text-sm text-black">비디오</span>
             </div>
           </div>
         </div>
@@ -699,23 +779,23 @@ export default function Home() {
         {/* 1단계: 스크립트 입력 */}
         {currentStep === 1 && (
         <div className="bg-white rounded-lg shadow-md p-6 mb-6">
-          <h2 className="text-xl font-semibold mb-4">1. 스크립트 입력</h2>
+          <h2 className="text-xl font-semibold mb-4 text-black">1. 스크립트 입력</h2>
           
           {/* AI 생성 옵션 */}
           <div className="mb-4 p-4 bg-blue-50 rounded-lg">
-            <h3 className="font-medium mb-2">AI로 스크립트 생성 (선택사항)</h3>
+            <h3 className="font-medium mb-2 text-black">AI로 스크립트 생성 (선택사항)</h3>
             <div className="flex gap-4">
               <input
                 type="text"
                 value={topic}
                 onChange={(e) => setTopic(e.target.value)}
                 placeholder="주제를 입력하세요... (예: 재미있는 과학 실험)"
-                className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-black"
               />
               <button
                 onClick={generateScript}
                 disabled={!topic.trim() || isGenerating}
-                className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed"
+                className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed text-black"
               >
                 {isGenerating ? "생성 중..." : "AI 생성"}
               </button>
@@ -724,12 +804,12 @@ export default function Home() {
 
           {/* 직접 입력 옵션 */}
           <div>
-            <h3 className="font-medium mb-2">또는 직접 스크립트 입력</h3>
-            <p className="text-sm text-blue-600 mb-2">💡 엔터를 누르면 자동으로 세그먼트가 분할됩니다</p>
+            <h3 className="font-medium mb-2 text-black">또는 직접 스크립트 입력</h3>
+            <p className="text-sm text-blue-600 mb-2 text-black">💡 엔터를 누르면 자동으로 세그먼트가 분할됩니다</p>
             <textarea
               value={script}
               onChange={(e) => setScript(e.target.value)}
-              className="w-full h-32 px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
+              className="w-full h-32 px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none text-black"
               placeholder="YouTube Shorts 스크립트를 직접 입력하세요...&#10;각 줄마다 엔터를 눌러 세그먼트를 나누세요&#10;&#10;예시:&#10;안녕하세요!&#10;오늘은 재미있는 실험을 해볼게요&#10;준비물은 이것입니다"
             />
           </div>
@@ -745,10 +825,9 @@ export default function Home() {
                     isThumbnail: false,
                     order: index + 1,
                     subtitlePosition: { x: 50, y: 75 },
-                    imagePosition: { x: 50, y: 50, scale: 1.5 }
+                    imagePosition: { x: 50, y: 50, scale: 2.0 }
                   }));
                   setSegments(newSegments);
-                  setShowSegments(true);
                   setCurrentStep(2);
                 }}
                 className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700"
@@ -764,9 +843,9 @@ export default function Home() {
         {/* 2단계: TTS 생성 */}
         {currentStep === 2 && (
           <div className="bg-white rounded-lg shadow-md p-6">
-            <h2 className="text-xl font-semibold mb-4">2. 스크립트 분할 및 TTS 생성</h2>
+            <h2 className="text-xl font-semibold mb-4 text-black">2. 스크립트 분할 및 TTS 생성</h2>
             <div className="mb-6">
-              <p className="text-gray-600 mb-2">각 문장을 개별 음성으로 생성합니다. 필요시 수정하거나 추가/삭제할 수 있습니다.</p>
+              <p className="text-black mb-2">각 문장을 개별 음성으로 생성합니다. 필요시 수정하거나 추가/삭제할 수 있습니다.</p>
               <div className="bg-amber-50 border border-amber-200 rounded-lg p-3">
                 <p className="text-sm text-amber-700">
                   ⏱️ <strong>TTS 생성은 시간이 소요됩니다.</strong> 생성 중에도 이미지 업로드 작업을 병행하실 수 있습니다!
@@ -789,9 +868,9 @@ export default function Home() {
             
             {/* 목소리 선택 */}
             <div className="mb-6 p-4 bg-blue-50 rounded-lg">
-              <h3 className="font-medium mb-3">목소리 선택</h3>
+              <h3 className="font-medium mb-3 text-black">목소리 선택</h3>
               <div className="flex gap-4">
-                <label className="flex items-center">
+                <label className="flex items-center text-black">
                   <input
                     type="radio"
                     name="voice"
@@ -802,7 +881,7 @@ export default function Home() {
                   />
                   여성 1 (부드러운 목소리)
                 </label>
-                <label className="flex items-center">
+                <label className="flex items-center text-black">
                   <input
                     type="radio"
                     name="voice"  
@@ -813,7 +892,7 @@ export default function Home() {
                   />
                   여성 2 (활기찬 목소리)
                 </label>
-                <label className="flex items-center">
+                <label className="flex items-center text-black">
                   <input
                     type="radio"
                     name="voice"
@@ -824,7 +903,7 @@ export default function Home() {
                   />
                   남성 1 (차분한 목소리)
                 </label>
-                <label className="flex items-center">
+                <label className="flex items-center text-black">
                   <input
                     type="radio"
                     name="voice"
@@ -843,7 +922,7 @@ export default function Home() {
                 <div key={segment.id} className="border-2 border-gray-200 rounded-lg p-4">
                   <div className="flex justify-between items-start mb-2">
                     <div className="flex items-center gap-2">
-                      <span className="text-sm font-medium text-gray-500">
+                      <span className="text-sm font-medium text-black">
                         세그먼트 {segment.order || index + 1}
                       </span>
                     </div>
@@ -872,7 +951,7 @@ export default function Home() {
                         } : s
                       ));
                     }}
-                    className="w-full h-20 px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
+                    className="w-full h-20 px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none text-black"
                     placeholder="텍스트 입력..."
                   />
                   
@@ -889,7 +968,7 @@ export default function Home() {
                     )}
                     
                     {segment.isGenerating && (
-                      <div className="flex items-center gap-2 text-sm text-gray-600">
+                      <div className="flex items-center gap-2 text-sm text-black">
                         <div className="animate-spin w-4 h-4 border-2 border-blue-600 border-t-transparent rounded-full"></div>
                         음성 생성 중...
                       </div>
@@ -931,7 +1010,7 @@ export default function Home() {
                   };
                   setSegments([...segments, newSegment]);
                 }}
-                className="w-full py-3 border-2 border-dashed border-gray-300 rounded-lg text-gray-500 hover:border-gray-400 hover:text-gray-600"
+                className="w-full py-3 border-2 border-dashed border-gray-300 rounded-lg text-black hover:border-gray-400 hover:text-black"
               >
                 + 새 세그먼트 추가
               </button>
@@ -940,18 +1019,17 @@ export default function Home() {
 
             <div className="mt-6 flex justify-between items-center">
               <button 
-                onClick={() => setShowSegments(false)}
-                className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50"
+                onClick={() => setCurrentStep(1)}
+                className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 text-black"
               >
                 이전 단계
               </button>
               
               <button 
                 onClick={() => {
-                  setShowImageUpload(true);
                   setCurrentStep(3);
                 }}
-                className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700"
+                className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 text-black"
               >
                 다음 단계 →
               </button>
@@ -962,9 +1040,9 @@ export default function Home() {
         {/* 이미지 업로드 및 자막 설정 섹션 */}
         {currentStep === 3 && (
           <div className="bg-white rounded-lg shadow-md p-6">
-            <h2 className="text-xl font-semibold mb-4">3. 이미지 설정</h2>
+            <h2 className="text-xl font-semibold mb-4 text-black">3. 이미지 설정</h2>
             <div className="mb-6">
-              <p className="text-gray-600 mb-2">썸네일과 각 세그먼트의 이미지를 업로드하고 위치를 설정하세요.</p>
+              <p className="text-black mb-2">썸네일과 각 세그먼트의 이미지를 업로드하고 위치를 설정하세요.</p>
               
               {/* 일괄 업로드 섹션 */}
               <div className="bg-green-50 border border-green-200 rounded-lg p-4 mb-4">
@@ -1015,13 +1093,13 @@ export default function Home() {
                         onChange={(e) => setShowThumbnailText(e.target.checked)}
                         className="w-4 h-4"
                       />
-                      <span className="font-medium">썸네일 텍스트 표시</span>
+                      <span className="font-medium text-black">썸네일 텍스트 표시</span>
                     </label>
                     {showThumbnailText && (
                       <textarea
                         value={thumbnailText}
                         onChange={(e) => setThumbnailText(e.target.value)}
-                        className="w-full p-3 border-2 border-purple-300 rounded-lg focus:border-purple-500 resize-none"
+                        className="w-full p-3 border-2 border-purple-300 rounded-lg focus:border-purple-500 resize-none text-black"
                         rows={3}
                         placeholder="썸네일 제목 입력..."
                       />
@@ -1030,8 +1108,8 @@ export default function Home() {
                   
                   {/* 썸네일 지속 시간 설정 */}
                   <div>
-                    <label className="block font-medium mb-2">썸네일 지속 시간</label>
-                    <div className="flex items-center gap-2">
+                    <label className="block font-medium mb-2 text-black">썸네일 지속 시간</label>
+                    <div className="flex items-center gap-2 text-black">
                       <input
                         type="number"
                         min="0.5"
@@ -1041,15 +1119,15 @@ export default function Home() {
                         onChange={(e) => setThumbnailDuration(parseFloat(e.target.value))}
                         className="w-20 p-2 border-2 border-purple-300 rounded focus:border-purple-500"
                       />
-                      <span className="text-sm text-purple-600">초</span>
+                      <span className="text-sm text-purple-600 text-black">초</span>
                     </div>
-                    <p className="text-xs text-gray-500 mt-1">썸네일이 영상 시작에 표시될 시간</p>
+                    <p className="text-xs text-black mt-1">썸네일이 영상 시작에 표시될 시간</p>
                   </div>
                 </div>
 
                 {/* 썸네일 이미지 설정 */}
                 <div className="h-64 flex flex-col">
-                  <h4 className="font-medium mb-2">썸네일 이미지</h4>
+                  <h4 className="font-medium mb-2 text-black">썸네일 이미지</h4>
                   {!thumbnailImage ? (
                     <div className="border-2 border-dashed border-purple-300 rounded-lg p-6 text-center flex-1 flex flex-col justify-center">
                       <input
@@ -1060,8 +1138,22 @@ export default function Home() {
                           if (file) {
                             const reader = new FileReader();
                             reader.onload = (e) => {
-                              setThumbnailImage(e.target?.result as string);
+                              const imageUrl = e.target?.result as string;
+                              setThumbnailImage(imageUrl);
                               setThumbnailImageName(file.name);
+                              
+                              // 썸네일도 자동으로 가로폭 꽉 채우는 스케일 설정
+                              const img = new Image();
+                              img.onload = () => {
+                                const videoWidth = 1080;
+                                const baseImageWidth = 600;
+                                const autoScale = videoWidth / baseImageWidth; // 1.8
+                                setThumbnailImagePosition(prev => ({
+                                  ...prev,
+                                  scale: autoScale
+                                }));
+                              };
+                              img.src = imageUrl;
                             };
                             reader.readAsDataURL(file);
                           }
@@ -1097,8 +1189,8 @@ export default function Home() {
 
                 {/* 배경 이미지 설정 */}
                 <div className="h-64 flex flex-col">
-                  <h4 className="font-medium mb-2">전체 배경 이미지</h4>
-                  <p className="text-xs text-gray-500 mb-2">모든 세그먼트에 적용 (9:16 권장)</p>
+                  <h4 className="font-medium mb-2 text-black">전체 배경 이미지</h4>
+                  <p className="text-xs text-black mb-2">모든 세그먼트에 적용 (9:16 권장)</p>
                   {!globalBackgroundImage ? (
                     <div className="border-2 border-dashed border-orange-300 rounded-lg p-6 text-center flex-1 flex flex-col justify-center">
                       <input
@@ -1141,12 +1233,12 @@ export default function Home() {
               {/* 통합된 썸네일 미리보기 */}
               {(thumbnailImage || showThumbnailText || globalBackgroundImage) && (
                 <div className="mt-6 p-4 bg-white bg-opacity-50 rounded-lg border border-purple-300">
-                  <h4 className="font-medium mb-3 text-purple-800">🎯 썸네일 미리보기 및 편집</h4>
-                  <p className="text-sm text-purple-600 mb-4">드래그하여 위치를 조정하고 오른쪽 패널에서 스타일을 수정하세요</p>
+                  <h4 className="font-medium mb-3 text-purple-800 text-black">🎯 썸네일 미리보기 및 편집</h4>
+                  <p className="text-sm text-purple-600 mb-4 text-black">드래그하여 위치를 조정하고 오른쪽 패널에서 스타일을 수정하세요</p>
                   
                   <div className="flex gap-6">
                     {/* 캔버스 크기 미리보기 (1080x1920) */}
-                    <div className="relative bg-black rounded-lg overflow-hidden shadow-2xl" style={{ width: '360px', height: '640px' }}>
+                    <div className="relative bg-black rounded-lg overflow-hidden shadow-2xl" style={{ width: '540px', height: '960px' }}>
                       {/* 배경 이미지 또는 검은 배경 */}
                       {globalBackgroundImage ? (
                         <img
@@ -1167,8 +1259,9 @@ export default function Home() {
                             top: `${thumbnailPosition.y}%`,
                             transform: 'translate(-50%, -50%)',
                             color: thumbnailTextColor,
-                            fontSize: `${thumbnailTextSize / 2}px`, // 미리보기는 절반 크기
-                            textShadow: '2px 2px 4px rgba(0,0,0,0.8)',
+                            fontSize: `${thumbnailTextSize * PREVIEW_SCALE}px`, // 미리보기 스케일 적용
+                            textShadow: `${3*PREVIEW_SCALE}px ${3*PREVIEW_SCALE}px ${6*PREVIEW_SCALE}px rgba(0,0,0,0.9)`,
+                            WebkitTextStroke: `${1*PREVIEW_SCALE}px #000000`,
                             zIndex: 30
                           }}
                           onMouseDown={(e) => {
@@ -1204,8 +1297,8 @@ export default function Home() {
                             left: `${thumbnailImagePosition.x}%`,
                             top: `${thumbnailImagePosition.y}%`,
                             transform: `translate(-50%, -50%) scale(${thumbnailImagePosition.scale})`,
-                            width: '150px', // 기본 크기 증가 (스케일 적용 고려)
-                            height: '100px',
+                            width: `${600 * PREVIEW_SCALE}px`, // 실제 Canvas 크기에 비례 (600px base)
+                            height: `${400 * PREVIEW_SCALE}px`, // 실제 Canvas 크기에 비례 (400px base)
                             zIndex: 25
                           }}
                           onMouseDown={(e) => {
@@ -1233,7 +1326,7 @@ export default function Home() {
                           <img
                             src={thumbnailImage}
                             alt="Thumbnail"
-                            className="w-full h-full object-cover"
+                            className="w-full h-full object-contain"
                           />
                         </div>
                       )}
@@ -1241,39 +1334,39 @@ export default function Home() {
                     
                     {/* 편집 패널 */}
                     <div className="flex-1 bg-gray-50 p-4 rounded-lg max-w-md">
-                      <h5 className="font-medium mb-4">🎨 썸네일 편집</h5>
+                      <h5 className="font-medium mb-4 text-black">🎨 썸네일 편집</h5>
                       
                       {/* 텍스트 옵션 */}
                       {showThumbnailText && (
                         <div className="space-y-4 mb-6 p-3 bg-white rounded border">
-                          <h6 className="font-medium text-sm">텍스트 설정</h6>
+                          <h6 className="font-medium text-sm text-black">텍스트 설정</h6>
                           
                           <div>
-                            <label className="block text-xs font-medium mb-1">텍스트 내용</label>
+                            <label className="block text-xs font-medium mb-1 text-black">텍스트 내용</label>
                             <textarea
                               value={thumbnailText}
                               onChange={(e) => setThumbnailText(e.target.value)}
-                              className="w-full p-2 border rounded text-sm resize-none"
+                              className="w-full p-2 border rounded text-sm resize-none text-black"
                               rows={2}
                             />
                           </div>
                           
                           <div className="grid grid-cols-2 gap-3">
                             <div>
-                              <label className="block text-xs font-medium mb-1">크기</label>
+                              <label className="block text-xs font-medium mb-1 text-black">크기</label>
                               <input
                                 type="range"
-                                min="16"
-                                max="64"
+                                min="36"
+                                max="120"
                                 value={thumbnailTextSize}
                                 onChange={(e) => updateThumbnailTextSize(parseInt(e.target.value))}
                                 className="w-full"
                               />
-                              <div className="text-xs text-gray-500 text-center">{thumbnailTextSize}px</div>
+                              <div className="text-xs text-black text-center">{thumbnailTextSize}px</div>
                             </div>
                             
                             <div>
-                              <label className="block text-xs font-medium mb-1">색상</label>
+                              <label className="block text-xs font-medium mb-1 text-black">색상</label>
                               <input
                                 type="color"
                                 value={thumbnailTextColor}
@@ -1294,27 +1387,27 @@ export default function Home() {
                       {/* 이미지 옵션 */}
                       {thumbnailImage && (
                         <div className="space-y-4 mb-6 p-3 bg-white rounded border">
-                          <h6 className="font-medium text-sm">이미지 설정</h6>
+                          <h6 className="font-medium text-sm text-black">이미지 설정</h6>
                           
                           <div>
-                            <label className="block text-xs font-medium mb-1">크기</label>
+                            <label className="block text-xs font-medium mb-1 text-black">크기</label>
                             <input
                               type="range"
-                              min="0.5"
-                              max="2.0"
+                              min="0.1"
+                              max="5.0"
                               step="0.1"
                               value={thumbnailImagePosition.scale}
                               onChange={(e) => setThumbnailImagePosition(prev => ({...prev, scale: parseFloat(e.target.value)}))}
                               className="w-full"
                             />
-                            <div className="text-xs text-gray-500 text-center">{Math.round(thumbnailImagePosition.scale * 100)}%</div>
+                            <div className="text-xs text-black text-center">{Math.round(thumbnailImagePosition.scale * 100)}%</div>
                           </div>
                         </div>
                       )}
                       
                       {/* 위치 프리셋 */}
                       <div className="space-y-3">
-                        <h6 className="font-medium text-sm">빠른 위치 설정</h6>
+                        <h6 className="font-medium text-sm text-black">빠른 위치 설정</h6>
                         <div className="grid grid-cols-3 gap-2">
                           <button
                             onClick={() => setThumbnailPosition({x: 50, y: 20})}
@@ -1350,7 +1443,7 @@ export default function Home() {
             
             {/* 세그먼트 리스트 - 탭 또는 쪼질 형태 */}
             <div className="mb-6">
-              <div className="flex flex-wrap gap-2 mb-4">
+              <div className="flex flex-wrap gap-2 mb-4 text-black">
                 {segments.map((segment, index) => (
                   <button
                     key={segment.id}
@@ -1358,7 +1451,7 @@ export default function Home() {
                     className={`px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
                       selectedSegmentId === segment.id 
                         ? 'bg-blue-600 text-white' 
-                        : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                        : 'bg-gray-200 text-black hover:bg-gray-300'
                     }`}
                   >
                     세그먼트 {index + 1}
@@ -1377,10 +1470,10 @@ export default function Home() {
                 return (
                 <div className="space-y-6">
                   <div className="flex items-center justify-between">
-                    <h3 className="text-xl font-semibold">📹 세그먼트 {index + 1} 편집</h3>
+                    <h3 className="text-xl font-semibold text-black">📹 세그먼트 {index + 1} 편집</h3>
                     <div className="flex gap-2">
                       <span className={`px-2 py-1 rounded text-xs ${ 
-                        segment.audioUrl ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-600'
+                        segment.audioUrl ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-black'
                       }`}>
                         {segment.audioUrl ? 'TTS 완료' : 'TTS 대기'}
                       </span>
@@ -1391,8 +1484,8 @@ export default function Home() {
                   <div className="grid grid-cols-2 gap-8">
                     {/* 실시간 미리보기 - 캔버스 크기 */}
                     <div>
-                      <h4 className="font-medium mb-3">📱 실시간 미리보기</h4>
-                      <div className="relative bg-black rounded-lg overflow-hidden shadow-2xl mx-auto" style={{ width: '360px', height: '640px' }}>
+                      <h4 className="font-medium mb-3 text-black">📱 실시간 미리보기</h4>
+                      <div className="relative bg-black rounded-lg overflow-hidden shadow-2xl mx-auto" style={{ width: '540px', height: '960px' }}>
                         {/* 배경 이미지 */}
                         {globalBackgroundImage ? (
                           <img
@@ -1413,8 +1506,9 @@ export default function Home() {
                               top: `${thumbnailPosition.y}%`,
                               transform: 'translate(-50%, -50%)',
                               color: thumbnailTextColor,
-                              fontSize: `${thumbnailTextSize / 3}px`, // 1080 기준으로 조정
-                              textShadow: '2px 2px 4px rgba(0,0,0,0.8)',
+                              fontSize: `${thumbnailTextSize * PREVIEW_SCALE}px`, // 미리보기 스케일 적용
+                              textShadow: `${3*PREVIEW_SCALE}px ${3*PREVIEW_SCALE}px ${6*PREVIEW_SCALE}px rgba(0,0,0,0.9)`,
+                            WebkitTextStroke: `${1*PREVIEW_SCALE}px #000000`,
                               zIndex: 30
                             }}
                           >
@@ -1474,8 +1568,9 @@ export default function Home() {
                             top: `${segment.subtitlePosition?.y || 75}%`,
                             transform: 'translate(-50%, -50%)',
                             color: segment.textColor || '#ffffff',
-                            fontSize: `${(segment.textSize || 24) / 3}px`, // 1080 기준 조정
-                            textShadow: '2px 2px 4px rgba(0,0,0,0.8)',
+                            fontSize: `${(segment.textSize || 36) * PREVIEW_SCALE}px`, // 미리보기 스케일 적용
+                            textShadow: `${3*PREVIEW_SCALE}px ${3*PREVIEW_SCALE}px ${6*PREVIEW_SCALE}px rgba(0,0,0,0.9)`,
+                            WebkitTextStroke: `${1*PREVIEW_SCALE}px #000000`,
                             zIndex: 35
                           }}
                           onMouseDown={(e) => {
@@ -1503,13 +1598,13 @@ export default function Home() {
                     
                     {/* 편집 패널 */}
                     <div className="space-y-6">
-                      <h4 className="font-medium">🎨 세그먼트 편집</h4>
+                      <h4 className="font-medium text-black">🎨 세그먼트 편집</h4>
                       
                       {/* 텍스트 편집 */}
                       <div className="bg-gray-50 p-4 rounded-lg">
                         <div className="flex justify-between items-center mb-3">
-                          <h5 className="font-medium">텍스트 설정</h5>
-                          <label className="flex items-center text-sm">
+                          <h5 className="font-medium text-black">텍스트 설정</h5>
+                          <label className="flex items-center text-sm text-black">
                             <input
                               type="checkbox"
                               checked={applyToAllSegments}
@@ -1521,7 +1616,7 @@ export default function Home() {
                         </div>
                         <div className="space-y-4">
                           <div>
-                            <label className="block text-sm font-medium mb-1">내용</label>
+                            <label className="block text-sm font-medium mb-1 text-black">내용</label>
                             <textarea
                               value={segment.text}
                               onChange={(e) => {
@@ -1529,27 +1624,27 @@ export default function Home() {
                                   s.id === segment.id ? { ...s, text: e.target.value } : s
                                 ));
                               }}
-                              className="w-full p-2 border rounded resize-none"
+                              className="w-full p-2 border rounded resize-none text-black"
                               rows={3}
                             />
                           </div>
                           
                           <div className="grid grid-cols-2 gap-3">
                             <div>
-                              <label className="block text-sm font-medium mb-1">크기</label>
+                              <label className="block text-sm font-medium mb-1 text-black">크기</label>
                               <input
                                 type="range"
-                                min="16"
-                                max="48"
-                                value={segment.textSize || 24}
+                                min="24"
+                                max="72"
+                                value={segment.textSize || 36}
                                 onChange={(e) => updateTextSize(segment.id, parseInt(e.target.value))}
                                 className="w-full"
                               />
-                              <div className="text-xs text-gray-500 text-center">{segment.textSize || 24}px</div>
+                              <div className="text-xs text-black text-center">{segment.textSize || 36}px</div>
                             </div>
                             
                             <div>
-                              <label className="block text-sm font-medium mb-1">색상</label>
+                              <label className="block text-sm font-medium mb-1 text-black">색상</label>
                               <input
                                 type="color"
                                 value={segment.textColor || '#ffffff'}
@@ -1572,13 +1667,13 @@ export default function Home() {
                       {/* 이미지 편집 */}
                       {segment.imageUrl && (
                         <div className="bg-gray-50 p-4 rounded-lg">
-                          <h5 className="font-medium mb-3">이미지 설정</h5>
+                          <h5 className="font-medium mb-3 text-black">이미지 설정</h5>
                           <div>
-                            <label className="block text-sm font-medium mb-1">크기</label>
+                            <label className="block text-sm font-medium mb-1 text-black">크기</label>
                             <input
                               type="range"
-                              min="0.5"
-                              max="2.0"
+                              min="0.1"
+                              max="5.0"
                               step="0.1"
                               value={segment.imagePosition?.scale || 1}
                               onChange={(e) => setSegments(prev => prev.map(s => 
@@ -1594,17 +1689,17 @@ export default function Home() {
                               ))}
                               className="w-full"
                             />
-                            <div className="text-xs text-gray-500 text-center">{Math.round((segment.imagePosition?.scale || 1) * 100)}%</div>
+                            <div className="text-xs text-black text-center">{Math.round((segment.imagePosition?.scale || 1) * 100)}%</div>
                           </div>
                         </div>
                       )}
                       
                       {/* 위치 프리셋 */}
                       <div className="bg-gray-50 p-4 rounded-lg">
-                        <h5 className="font-medium mb-3">빠른 위치 설정</h5>
+                        <h5 className="font-medium mb-3 text-black">빠른 위치 설정</h5>
                         <div className="space-y-3">
                           <div>
-                            <label className="block text-sm font-medium mb-2">자막 위치</label>
+                            <label className="block text-sm font-medium mb-2 text-black">자막 위치</label>
                             <div className="grid grid-cols-3 gap-2">
                               <button
                                 onClick={() => updateSubtitlePosition(segment.id, 50, 20)}
@@ -1626,6 +1721,53 @@ export default function Home() {
                               </button>
                             </div>
                           </div>
+                          
+                          {/* 이미지 편집 컨트롤 */}
+                          {segment.imageUrl && (
+                            <div>
+                              <label className="block text-sm font-medium mb-2 text-black">이미지 편집</label>
+                              <div className="grid grid-cols-2 gap-2">
+                                <button
+                                  onClick={() => {
+                                    const newEditingId = editingImageId === segment.id ? null : segment.id;
+                                    console.log('편집 모드 변경:', editingImageId, '->', newEditingId);
+                                    setEditingImageId(newEditingId);
+                                  }}
+                                  className={`px-3 py-2 text-xs rounded font-medium ${
+                                    editingImageId === segment.id 
+                                      ? 'bg-red-500 text-white hover:bg-red-600' 
+                                      : 'bg-green-500 text-white hover:bg-green-600'
+                                  }`}
+                                >
+                                  {editingImageId === segment.id ? '편집 완료' : '🖼️ 이미지 편집'}
+                                </button>
+                                <button
+                                  onClick={() => {
+                                    setSegments(prev => prev.map(s => 
+                                      s.id === segment.id ? { 
+                                        ...s, 
+                                        imagePosition: { x: 50, y: 50, scale: 1.8 } // 기본값으로 리셋
+                                      } : s
+                                    ));
+                                  }}
+                                  className="px-3 py-2 bg-gray-500 text-white text-xs rounded hover:bg-gray-600 font-medium"
+                                >
+                                  🔄 위치 리셋
+                                </button>
+                              </div>
+                              
+                              {editingImageId === segment.id && (
+                                <div className="mt-2 p-2 bg-blue-50 rounded text-xs text-blue-700">
+                                  💡 미리보기에서 이미지를 드래그하여 위치를 조정하고, 모서리 핸들을 드래그하여 크기를 조절하세요.
+                                </div>
+                              )}
+                              
+                              {/* 디버깅 정보 */}
+                              <div className="mt-2 p-1 bg-gray-100 rounded text-xs text-gray-600">
+                                디버그: editingImageId = {editingImageId || 'null'}, segment.id = {segment.id}
+                              </div>
+                            </div>
+                          )}
                         </div>
                       </div>
                     </div>
@@ -1660,12 +1802,12 @@ export default function Home() {
                 >
                   <div className="flex justify-between items-start mb-4">
                     <div className="flex items-center gap-2">
-                      <div className="cursor-move text-gray-400 hover:text-gray-600 text-lg">
+                      <div className="cursor-move text-black hover:text-black text-lg">
                         ⋮⋮
                       </div>
                       <div className="flex-1">
                         <div className="flex items-center justify-between">
-                          <h3 className="font-medium text-lg">
+                          <h3 className="font-medium text-lg text-black">
                             📹 세그먼트 {segment.order || index + 1}
                           </h3>
                           
@@ -1735,7 +1877,7 @@ export default function Home() {
                                       return newPending;
                                     });
                                   }}
-                                  className="px-3 py-1 bg-gray-300 text-gray-700 text-xs rounded hover:bg-gray-400"
+                                  className="px-3 py-1 bg-gray-300 text-black text-xs rounded hover:bg-gray-400"
                                 >
                                   취소
                                 </button>
@@ -1765,7 +1907,7 @@ export default function Home() {
                     {/* 메인 이미지 업로드 */}
                     <div>
                       <h4 className="font-medium mb-2">메인 이미지</h4>
-                      <p className="text-xs text-gray-500 mb-2">영상 중앙에 표시될 이미지</p>
+                      <p className="text-xs text-black mb-2">영상 중앙에 표시될 이미지</p>
                       {!segment.imageUrl ? (
                         <div className="border-2 border-dashed border-gray-300 rounded-lg p-4 text-center">
                           <input
@@ -1782,16 +1924,16 @@ export default function Home() {
                             htmlFor={`image-upload-${segment.id}`}
                             className="cursor-pointer block"
                           >
-                            <div className="text-gray-400 mb-2">📷</div>
-                            <p className="text-xs text-gray-600">메인 이미지 업로드</p>
+                            <div className="text-black mb-2">📷</div>
+                            <p className="text-xs text-black">메인 이미지 업로드</p>
                           </label>
                         </div>
                       ) : (
                         <div className="p-3 bg-gray-100 border-2 border-gray-300 rounded">
                           <div className="flex items-center justify-between">
                             <div>
-                              <div className="text-gray-400 mb-1">📷</div>
-                              <p className="text-xs text-gray-600 font-medium">{segment.imageName}</p>
+                              <div className="text-black mb-1">📷</div>
+                              <p className="text-xs text-black font-medium">{segment.imageName}</p>
                             </div>
                             <button
                               onClick={() => {
@@ -1812,8 +1954,8 @@ export default function Home() {
                     {/* 한국형 Shorts 미리보기 */}
                     {(segment.imageUrl || globalBackgroundImage || showThumbnailText) && (
                       <div>
-                        <h4 className="font-medium mb-2 text-lg">📱 실시간 Shorts 미리보기</h4>
-                        <p className="text-xs text-gray-500 mb-3">썸네일 텍스트 + 세그먼트 이미지 + 자막 최종 미리보기</p>
+                        <h4 className="font-medium mb-2 text-lg text-black">📱 실시간 Shorts 미리보기</h4>
+                        <p className="text-xs text-black mb-3">썸네일 텍스트 + 세그먼트 이미지 + 자막 최종 미리보기</p>
                         
                         <div className="relative bg-black rounded-lg overflow-hidden mx-auto shadow-2xl" style={{ aspectRatio: '9/16', height: '350px' }}>
                           {/* 배경 이미지 또는 검은 배경 */}
@@ -1836,8 +1978,9 @@ export default function Home() {
                                 top: `${thumbnailPosition.y}%`,
                                 transform: 'translate(-50%, -50%)',
                                 color: thumbnailTextColor,
-                                fontSize: `${thumbnailTextSize * 0.7}px`, // 세그먼트 미리보기는 70% 크기
-                                textShadow: '2px 2px 4px rgba(0,0,0,0.8)',
+                                fontSize: `${(thumbnailTextSize * 0.7) * PREVIEW_SCALE}px`, // 미리보기 스케일 적용
+                                textShadow: `${3*PREVIEW_SCALE}px ${3*PREVIEW_SCALE}px ${6*PREVIEW_SCALE}px rgba(0,0,0,0.9)`,
+                            WebkitTextStroke: `${1*PREVIEW_SCALE}px #000000`,
                                 zIndex: 30
                               }}
                               onMouseDown={(e) => {
@@ -1866,19 +2009,22 @@ export default function Home() {
                           )}
 
                           
-                          {/* 세그먼트 메인 이미지 (자유 이동 가능) */}
+                          {/* 세그먼트 메인 이미지 (편집 가능) */}
                           {segment.imageUrl && (
                             <div
-                              className="absolute cursor-move"
+                              className={`absolute ${editingImageId === segment.id ? 'cursor-default' : 'cursor-move'}`}
                               style={{
                                 left: `${segment.imagePosition?.x || 50}%`,
                                 top: `${segment.imagePosition?.y || 50}%`,
                                 transform: `translate(-50%, -50%) scale(${segment.imagePosition?.scale || 1})`,
-                                width: '150px',
-                                height: '100px',
+                                width: `${600 * PREVIEW_SCALE}px`,
+                                height: `${400 * PREVIEW_SCALE}px`,
                                 zIndex: 20
                               }}
+                              onDoubleClick={() => setEditingImageId(editingImageId === segment.id ? null : segment.id)}
                               onMouseDown={(e) => {
+                                if (editingImageId === segment.id) return; // 편집 모드에서는 드래그 비활성화
+                                
                                 const rect = e.currentTarget.parentElement!.getBoundingClientRect();
                                 
                                 const handleMouseMove = (e: MouseEvent) => {
@@ -1908,8 +2054,88 @@ export default function Home() {
                               <img
                                 src={segment.imageUrl}
                                 alt="Segment"
-                                className="w-full h-full object-cover"
+                                className="w-full h-full object-contain border-2 border-white/20"
                               />
+                              
+                              {/* 편집 모드 - 리사이즈 핸들과 테두리 */}
+                              {editingImageId === segment.id && (
+                                <>
+                                  {/* 편집 모드 테두리 */}
+                                  <div className="absolute inset-0 border-2 border-blue-500 rounded-lg pointer-events-none"></div>
+                                  
+                                  {/* 모서리 핸들들 */}
+                                  <div 
+                                    className="absolute -top-2 -left-2 w-4 h-4 bg-blue-500 border-2 border-white rounded-full cursor-nw-resize shadow-lg"
+                                    onMouseDown={(e) => {
+                                      e.stopPropagation();
+                                      const startScale = segment.imagePosition?.scale || 1;
+                                      const startX = e.clientX;
+                                      const startY = e.clientY;
+                                      
+                                      const handleResize = (e: MouseEvent) => {
+                                        const deltaX = e.clientX - startX;
+                                        const deltaY = e.clientY - startY;
+                                        const avgDelta = (deltaX + deltaY) / 2;
+                                        const scaleChange = avgDelta / 150; // 더 세밀한 조정
+                                        const newScale = Math.max(0.1, Math.min(5, startScale + scaleChange));
+                                        
+                                        setSegments(prev => prev.map(s => 
+                                          s.id === segment.id ? { 
+                                            ...s, 
+                                            imagePosition: { ...s.imagePosition, scale: newScale, x: s.imagePosition?.x || 50, y: s.imagePosition?.y || 50 }
+                                          } : s
+                                        ));
+                                      };
+                                      
+                                      const handleResizeEnd = () => {
+                                        document.removeEventListener('mousemove', handleResize);
+                                        document.removeEventListener('mouseup', handleResizeEnd);
+                                      };
+                                      
+                                      document.addEventListener('mousemove', handleResize);
+                                      document.addEventListener('mouseup', handleResizeEnd);
+                                    }}
+                                  ></div>
+                                  
+                                  <div 
+                                    className="absolute -top-2 -right-2 w-4 h-4 bg-blue-500 border-2 border-white rounded-full cursor-ne-resize shadow-lg"
+                                    onMouseDown={(e) => {
+                                      e.stopPropagation();
+                                      const startScale = segment.imagePosition?.scale || 1;
+                                      const startX = e.clientX;
+                                      const startY = e.clientY;
+                                      
+                                      const handleResize = (e: MouseEvent) => {
+                                        const deltaX = e.clientX - startX;
+                                        const deltaY = -(e.clientY - startY); // 반대 방향
+                                        const avgDelta = (deltaX + deltaY) / 2;
+                                        const scaleChange = avgDelta / 150;
+                                        const newScale = Math.max(0.1, Math.min(5, startScale + scaleChange));
+                                        
+                                        setSegments(prev => prev.map(s => 
+                                          s.id === segment.id ? { 
+                                            ...s, 
+                                            imagePosition: { ...s.imagePosition, scale: newScale, x: s.imagePosition?.x || 50, y: s.imagePosition?.y || 50 }
+                                          } : s
+                                        ));
+                                      };
+                                      
+                                      const handleResizeEnd = () => {
+                                        document.removeEventListener('mousemove', handleResize);
+                                        document.removeEventListener('mouseup', handleResizeEnd);
+                                      };
+                                      
+                                      document.addEventListener('mousemove', handleResize);
+                                      document.addEventListener('mouseup', handleResizeEnd);
+                                    }}
+                                  ></div>
+                                  
+                                  {/* 편집 안내 */}
+                                  <div className="absolute -top-10 left-1/2 transform -translate-x-1/2 bg-blue-600 text-white px-3 py-1 rounded text-xs whitespace-nowrap shadow-lg">
+                                    ✨ 편집 모드 • 모서리 드래그로 크기 조절 • 스케일: {(segment.imagePosition?.scale || 1).toFixed(1)}x
+                                  </div>
+                                </>
+                              )}
                             </div>
                           )}
                           
@@ -1920,7 +2146,8 @@ export default function Home() {
                               left: `${segment.subtitlePosition?.x || 50}%`,
                               top: `${segment.subtitlePosition?.y || 75}%`,
                               transform: 'translate(-50%, -50%)',
-                              textShadow: '2px 2px 4px rgba(0,0,0,0.8)',
+                              textShadow: `${3*PREVIEW_SCALE}px ${3*PREVIEW_SCALE}px ${6*PREVIEW_SCALE}px rgba(0,0,0,0.9)`,
+                            WebkitTextStroke: `${1*PREVIEW_SCALE}px #000000`,
                               zIndex: 35
                             }}
                             onMouseDown={(e) => {
@@ -1949,7 +2176,7 @@ export default function Home() {
                         </div>
                         
                         <div className="mt-4 space-y-2">
-                          <div className="text-xs text-gray-600 space-y-1">
+                          <div className="text-xs text-black space-y-1">
                             <p><span className="inline-block w-3 h-3 bg-purple-400 rounded mr-2"></span>썸네일 텍스트 (모든 세그먼트에 표시)</p>
                             <p><span className="inline-block w-3 h-3 bg-blue-400 rounded mr-2"></span>세그먼트 이미지 (드래그로 이동 가능)</p>
                             <p><span className="inline-block w-3 h-3 bg-green-400 rounded mr-2"></span>세그먼트 자막 (드래그로 이동 가능)</p>
@@ -1990,7 +2217,7 @@ export default function Home() {
             <div className="mt-6 flex justify-between items-center">
               <button 
                 onClick={() => setCurrentStep(2)}
-                className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50"
+                className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 text-black"
               >
                 이전 단계
               </button>
@@ -2021,7 +2248,7 @@ export default function Home() {
         {/* 4단계: 비디오 생성 */}
         {currentStep === 4 && (
           <div className="bg-white rounded-lg shadow-md p-6 mb-6">
-            <h2 className="text-xl font-semibold mb-4">4. 비디오 생성</h2>
+            <h2 className="text-xl font-semibold mb-4 text-black">4. 비디오 생성</h2>
             
             <div className="text-center">
               <button 
@@ -2043,7 +2270,7 @@ export default function Home() {
             <div className="mt-6 flex justify-start">
               <button 
                 onClick={() => setCurrentStep(3)}
-                className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50"
+                className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 text-black"
               >
                 이전 단계
               </button>
@@ -2054,12 +2281,12 @@ export default function Home() {
         {/* 비디오 결과 섹션 */}
         {videoResult && currentStep === 4 && (
           <div className="bg-white rounded-lg shadow-md p-6">
-            <h2 className="text-xl font-semibold mb-4">🎉 비디오 생성 완료!</h2>
+            <h2 className="text-xl font-semibold mb-4 text-black">🎉 비디오 생성 완료!</h2>
             
             <div className="grid md:grid-cols-2 gap-6">
               {/* 비디오 플레이어 */}
               <div>
-                <h3 className="font-medium mb-3">📹 생성된 비디오</h3>
+                <h3 className="font-medium mb-3 text-black">📹 생성된 비디오</h3>
                 <div className="relative bg-black rounded-lg overflow-hidden shadow-lg" style={{ aspectRatio: '9/16', height: '400px' }}>
                   <video
                     src={videoResult}
@@ -2120,31 +2347,31 @@ export default function Home() {
               {/* 비디오 정보 및 다운로드 */}
               <div className="space-y-4">
                 <div>
-                  <h3 className="font-medium mb-3">📊 비디오 정보</h3>
+                  <h3 className="font-medium mb-3 text-black">📊 비디오 정보</h3>
                   <div className="bg-gray-50 p-4 rounded-lg space-y-2">
                     <div className="flex justify-between">
-                      <span className="text-gray-600">썸네일 지속시간:</span>
-                      <span className="font-medium">{thumbnailDuration}초</span>
+                      <span className="text-black">썸네일 지속시간:</span>
+                      <span className="font-medium text-blue-600">{thumbnailDuration}초</span>
                     </div>
                     <div className="flex justify-between">
-                      <span className="text-gray-600">세그먼트 수:</span>
-                      <span className="font-medium">{segments.length}개</span>
+                      <span className="text-black">세그먼트 수:</span>
+                      <span className="font-medium text-blue-600">{segments.length}개</span>
                     </div>
                     <div className="flex justify-between">
-                      <span className="text-gray-600">총 길이:</span>
-                      <span className="font-medium">
+                      <span className="text-black">총 길이:</span>
+                      <span className="font-medium text-blue-600">
                         {Math.round((thumbnailDuration + segments.reduce((acc, s) => acc + (s.audioDuration || 2), 0)) * 10) / 10}초
                       </span>
                     </div>
                     <div className="flex justify-between">
-                      <span className="text-gray-600">해상도:</span>
-                      <span className="font-medium">9:16 (Shorts 최적화)</span>
+                      <span className="text-black">해상도:</span>
+                      <span className="font-medium text-blue-600">9:16 (Shorts 최적화)</span>
                     </div>
                   </div>
                 </div>
 
                 <div>
-                  <h3 className="font-medium mb-3">📁 다운로드 및 공유</h3>
+                  <h3 className="font-medium mb-3 text-black">📁 다운로드 및 공유</h3>
                   <div className="space-y-3">
                     <a
                       href={videoResult}
@@ -2169,8 +2396,6 @@ export default function Home() {
                         setVideoResult("");
                         setIsGeneratingVideo(false);
                         setCurrentStep(1);
-                        setShowSegments(false);
-                        setShowImageUpload(false);
                       }}
                       className="w-full px-4 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 font-medium"
                     >
