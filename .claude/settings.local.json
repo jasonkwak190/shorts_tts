@@ -14,7 +14,15 @@
       "Bash(rg:*)",
       "Bash(npm run build:*)",
       "Bash(pkill:*)",
-      "mcp__ide__getDiagnostics"
+      "mcp__ide__getDiagnostics",
+      "Bash(find:*)",
+      "Bash(ls:*)",
+      "Bash(npm run lint)",
+      "Bash(npx tsc:*)",
+      "Bash(sed:*)",
+      "Bash(node:*)",
+      "Bash(npx eslint:*)",
+      "Bash(awk:*)"
     ],
     "deny": []
   }

@@ -110,21 +110,27 @@ export default function Home() {
   const [thumbnailPosition, setThumbnailPosition] = useState<{x: number; y: number}>({x: 50, y: 30});
   const [thumbnailImage, setThumbnailImage] = useState<string>("");
   const [thumbnailImageName, setThumbnailImageName] = useState<string>("");
-  const [thumbnailImagePosition, setThumbnailImagePosition] = useState<{x: number; y: number; scale: number}>({x: 50, y: 50, scale: 2.0});
+  const [thumbnailImagePosition, setThumbnailImagePosition] = useState<{x: number; y: number; scale: number}>({x: 50, y: 50, scale: 2.7});
   const [showThumbnailText, setShowThumbnailText] = useState<boolean>(true);
   const [thumbnailDuration, setThumbnailDuration] = useState<number>(1);
   const [thumbnailTextColor, setThumbnailTextColor] = useState<string>('#ffffff');
-  const [thumbnailTextSize, setThumbnailTextSize] = useState<number>(60); // 더 큰 기본 크기로 변경
+  const [thumbnailTextSize, setThumbnailTextSize] = useState<number>(30); // PREVIEW_SCALE 1.0에 맞춘 적절한 크기
   const [selectedSegmentId, setSelectedSegmentId] = useState<string | null>(null); // 선택된 세그먼트
   const [isGeneratingVideo, setIsGeneratingVideo] = useState<boolean>(false);
   const [editingImageId, setEditingImageId] = useState<string | null>(null); // 편집 중인 이미지 ID
   const [videoResult, setVideoResult] = useState<string>("");
   const [currentStep, setCurrentStep] = useState<number>(1); // 1: 스크립트, 2: TTS, 3: 이미지, 4: 비디오
   const [completionNotifications, setCompletionNotifications] = useState<string[]>([]); // TTS 완료 알림
-  const [applyToAllSegments, setApplyToAllSegments] = useState<boolean>(false); // 전체 세그먼트에 텍스트 설정 적용
+  // const [, setApplyToAllSegments] = useState<boolean>(false); // 전체 세그먼트에 텍스트 설정 적용 - 현재 사용 안함
 
   // 실제 캔버스와 미리보기 크기 비율
-  const PREVIEW_SCALE = 0.5; // 미리보기는 실제 크기의 50% (540/1080 = 0.5)
+  const VIDEO_WIDTH = 1080;
+  const VIDEO_HEIGHT = 1920;
+  const PREVIEW_SCALE = 1.0; // 미리보기를 실제 크기와 동일하게 (1080x1920)
+  
+  // 일관된 이미지 베이스 크기 (9:16 비율 유지)
+  const BASE_IMAGE_WIDTH = 540; // 9:16 비율 유지를 위해 수정
+  const BASE_IMAGE_HEIGHT = 960; // 9:16 비율 유지를 위해 수정
 
   // 세그먼트가 생성되면 첫 번째 세그먼트 자동 선택
   useEffect(() => {
@@ -160,6 +166,7 @@ export default function Home() {
     }
   };
 
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const generateTTSForSegment = async (segmentId: string, _text: string, _voice: string) => {
     setSegments(prev => prev.map(s => 
       s.id === segmentId ? { ...s, isGenerating: true } : s
@@ -216,9 +223,9 @@ export default function Home() {
       const img = new Image();
       img.onload = () => {
         // 유튜브 쇼츠 가로폭 1080px에 맞게 자동 스케일 계산
-        const videoWidth = 1080;
-        const baseImageWidth = 600; // Canvas 기본 이미지 크기
-        const autoScale = videoWidth / baseImageWidth; // 1080 / 600 = 1.8
+        const videoWidth = VIDEO_WIDTH;
+        const baseImageWidth = BASE_IMAGE_WIDTH; // 9:16 비율 유지 베이스 크기
+        const autoScale = (videoWidth / baseImageWidth) * 1.5; // 배율 조정
         
         setSegments(prev => prev.map(s => 
           s.id === segmentId ? { 
@@ -249,9 +256,9 @@ export default function Home() {
           // 자동 스케일 계산
           const img = new Image();
           img.onload = () => {
-            const videoWidth = 1080;
-            const baseImageWidth = 600;
-            const autoScale = videoWidth / baseImageWidth; // 1.8
+            const videoWidth = VIDEO_WIDTH;
+            const baseImageWidth = BASE_IMAGE_WIDTH;
+            const autoScale = (videoWidth / baseImageWidth) * 1.5; // 2.7 (양옆 꽉차게)
             
             setSegments(prev => prev.map(s => 
               s.id === targetSegment.id ? { 
@@ -327,31 +334,31 @@ export default function Home() {
     });
   };
 
-  // 텍스트 색상 업데이트 (전체 적용 옵션 고려)
-  const updateTextColor = (segmentId: string, color: string) => {
-    if (applyToAllSegments) {
-      // 모든 세그먼트에 적용
-      setSegments(prev => prev.map(s => ({ ...s, textColor: color })));
-    } else {
-      // 선택된 세그먼트에만 적용
-      setSegments(prev => prev.map(s => 
-        s.id === segmentId ? { ...s, textColor: color } : s
-      ));
-    }
-  };
+  // 텍스트 색상 업데이트 (전체 적용 옵션 고려) - 현재 사용 안함
+  // const updateTextColor = (segmentId: string, color: string) => {
+  //   if (applyToAllSegments) {
+  //     // 모든 세그먼트에 적용
+  //     setSegments(prev => prev.map(s => ({ ...s, textColor: color })));
+  //   } else {
+  //     // 선택된 세그먼트에만 적용
+  //     setSegments(prev => prev.map(s => 
+  //       s.id === segmentId ? { ...s, textColor: color } : s
+  //     ));
+  //   }
+  // };
 
-  // 텍스트 크기 업데이트 (전체 적용 옵션 고려)
-  const updateTextSize = (segmentId: string, size: number) => {
-    if (applyToAllSegments) {
-      // 모든 세그먼트에 적용
-      setSegments(prev => prev.map(s => ({ ...s, textSize: size })));
-    } else {
-      // 선택된 세그먼트에만 적용
-      setSegments(prev => prev.map(s => 
-        s.id === segmentId ? { ...s, textSize: size } : s
-      ));
-    }
-  };
+  // 텍스트 크기 업데이트 (전체 적용 옵션 고려) - 현재 사용 안함
+  // const updateTextSize = (segmentId: string, size: number) => {
+  //   if (applyToAllSegments) {
+  //     // 모든 세그먼트에 적용
+  //     setSegments(prev => prev.map(s => ({ ...s, textSize: size })));
+  //   } else {
+  //     // 선택된 세그먼트에만 적용
+  //     setSegments(prev => prev.map(s => 
+  //       s.id === segmentId ? { ...s, textSize: size } : s
+  //     ));
+  //   }
+  // };
 
   // 썸네일 텍스트 크기 변경 시 모든 세그먼트에 동기화
   const updateThumbnailTextSize = (size: number) => {
@@ -375,8 +382,8 @@ export default function Home() {
       // Canvas 설정 (9:16 비율 - 고화질)
       const canvas = document.createElement('canvas');
       const ctx = canvas.getContext('2d')!;
-      canvas.width = 1080;
-      canvas.height = 1920;
+      canvas.width = VIDEO_WIDTH;
+      canvas.height = VIDEO_HEIGHT;
       
       const stream = canvas.captureStream(30); // 30fps
       const mediaRecorder = new MediaRecorder(stream, {
@@ -449,9 +456,9 @@ export default function Home() {
         if (time < thumbnailDuration) {
           // 썸네일 이미지 (미리보기와 완전히 동일한 비율과 위치)
           if (thumbnailImg) {
-            // 더 큰 기본 크기 설정 (화면을 더 잘 채우도록)
-            const baseWidth = 600; // 기본 크기를 2배로 증가
-            const baseHeight = 400; // 기본 크기를 2배로 증가
+            // 9:16 비율 유지하는 기본 크기 설정
+            const baseWidth = BASE_IMAGE_WIDTH; // 9:16 비율 유지
+            const baseHeight = BASE_IMAGE_HEIGHT; // 9:16 비율 유지
             
             // CSS transform: scale() 동작 모방 - 중앙점 기준 스케일링
             const scale = thumbnailImagePosition.scale;
@@ -581,9 +588,9 @@ export default function Home() {
             // 세그먼트 이미지 (미리보기와 완전히 동일한 비율과 위치)
             const segmentImg = segmentImages[currentSegmentIndex];
             if (segmentImg) {
-              // 더 큰 기본 크기 설정 (화면을 더 잘 채우도록)
-              const baseWidth = 600; // 기본 크기를 2배로 증가
-              const baseHeight = 400; // 기본 크기를 2배로 증가
+              // 9:16 비율 유지하는 기본 크기 설정
+              const baseWidth = BASE_IMAGE_WIDTH; // 9:16 비율 유지
+              const baseHeight = BASE_IMAGE_HEIGHT; // 9:16 비율 유지
               
               // CSS transform: scale() 동작 모방 - 중앙점 기준 스케일링
               const scale = segment.imagePosition?.scale || 1;
@@ -825,7 +832,7 @@ export default function Home() {
                     isThumbnail: false,
                     order: index + 1,
                     subtitlePosition: { x: 50, y: 75 },
-                    imagePosition: { x: 50, y: 50, scale: 2.0 }
+                    imagePosition: { x: 50, y: 50, scale: 2.7 }
                   }));
                   setSegments(newSegments);
                   setCurrentStep(2);
@@ -1145,9 +1152,9 @@ export default function Home() {
                               // 썸네일도 자동으로 가로폭 꽉 채우는 스케일 설정
                               const img = new Image();
                               img.onload = () => {
-                                const videoWidth = 1080;
-                                const baseImageWidth = 600;
-                                const autoScale = videoWidth / baseImageWidth; // 1.8
+                                const videoWidth = VIDEO_WIDTH;
+                                const baseImageWidth = BASE_IMAGE_WIDTH;
+                                const autoScale = (videoWidth / baseImageWidth) * 1.5; // 2.7 (양옆 꽉차게)
                                 setThumbnailImagePosition(prev => ({
                                   ...prev,
                                   scale: autoScale
@@ -1238,7 +1245,8 @@ export default function Home() {
                   
                   <div className="flex gap-6">
                     {/* 캔버스 크기 미리보기 (1080x1920) */}
-                    <div className="relative bg-black rounded-lg overflow-hidden shadow-2xl" style={{ width: '540px', height: '960px' }}>
+                    <div style={{ width: '540px', height: '960px', overflow: 'hidden' }}>
+                      <div className="relative bg-black overflow-hidden shadow-2xl" style={{ width: '1080px', height: '1920px', transform: 'scale(0.5)', transformOrigin: 'top left' }}>
                       {/* 배경 이미지 또는 검은 배경 */}
                       {globalBackgroundImage ? (
                         <img
@@ -1297,8 +1305,8 @@ export default function Home() {
                             left: `${thumbnailImagePosition.x}%`,
                             top: `${thumbnailImagePosition.y}%`,
                             transform: `translate(-50%, -50%) scale(${thumbnailImagePosition.scale})`,
-                            width: `${600 * PREVIEW_SCALE}px`, // 실제 Canvas 크기에 비례 (600px base)
-                            height: `${400 * PREVIEW_SCALE}px`, // 실제 Canvas 크기에 비례 (400px base)
+                            width: `${BASE_IMAGE_WIDTH * PREVIEW_SCALE}px`, // 9:16 비율 유지하는 베이스 크기
+                            height: `${BASE_IMAGE_HEIGHT * PREVIEW_SCALE}px`, // 9:16 비율 유지하는 베이스 크기
                             zIndex: 25
                           }}
                           onMouseDown={(e) => {
@@ -1356,8 +1364,8 @@ export default function Home() {
                               <label className="block text-xs font-medium mb-1 text-black">크기</label>
                               <input
                                 type="range"
-                                min="36"
-                                max="120"
+                                min="18"
+                                max="60"
                                 value={thumbnailTextSize}
                                 onChange={(e) => updateThumbnailTextSize(parseInt(e.target.value))}
                                 className="w-full"
@@ -1386,15 +1394,15 @@ export default function Home() {
                       
                       {/* 이미지 옵션 */}
                       {thumbnailImage && (
-                        <div className="space-y-4 mb-6 p-3 bg-white rounded border">
-                          <h6 className="font-medium text-sm text-black">이미지 설정</h6>
+                        <div className="space-y-4 mb-6 p-3 bg-blue-50 rounded-lg border border-blue-200">
+                          <h6 className="font-medium text-sm text-blue-800">🖼️ 썸네일 이미지 편집</h6>
                           
                           <div>
                             <label className="block text-xs font-medium mb-1 text-black">크기</label>
                             <input
                               type="range"
-                              min="0.1"
-                              max="5.0"
+                              min="0.3"
+                              max="8.0"
                               step="0.1"
                               value={thumbnailImagePosition.scale}
                               onChange={(e) => setThumbnailImagePosition(prev => ({...prev, scale: parseFloat(e.target.value)}))}
@@ -1402,9 +1410,205 @@ export default function Home() {
                             />
                             <div className="text-xs text-black text-center">{Math.round(thumbnailImagePosition.scale * 100)}%</div>
                           </div>
+
+                          <div className="flex gap-2">
+                            <input
+                              type="file"
+                              accept="image/*"
+                              onChange={(e) => {
+                                const file = e.target.files?.[0];
+                                if (file) {
+                                  const reader = new FileReader();
+                                  reader.onload = (e) => {
+                                    const imageUrl = e.target?.result as string;
+                                    setThumbnailImage(imageUrl);
+                                    setThumbnailImageName(file.name);
+                                  };
+                                  reader.readAsDataURL(file);
+                                }
+                              }}
+                              className="hidden"
+                              id="thumbnail-image-replace"
+                            />
+                            <label
+                              htmlFor="thumbnail-image-replace"
+                              className="cursor-pointer flex-1 bg-blue-500 hover:bg-blue-600 text-white text-xs py-2 px-3 rounded text-center font-medium transition-colors"
+                            >
+                              🔄 이미지 교체
+                            </label>
+                            <button
+                              onClick={() => {
+                                setThumbnailImage("");
+                                setThumbnailImageName("");
+                                setThumbnailImagePosition({x: 50, y: 50, scale: 2.7});
+                              }}
+                              className="bg-red-500 hover:bg-red-600 text-white text-xs py-2 px-3 rounded font-medium transition-colors"
+                              title="썸네일 이미지 삭제"
+                            >
+                              🗑️ 삭제
+                            </button>
+                          </div>
+
+                          <div>
+                            <label className="block text-xs font-medium mb-2 text-black">위치 조절</label>
+                            <div className="grid grid-cols-3 gap-2">
+                              <button
+                                onClick={() => setThumbnailImagePosition(prev => ({...prev, x: 25, y: 25}))}
+                                className="px-2 py-1 bg-gray-200 text-gray-700 text-xs rounded hover:bg-gray-300"
+                              >
+                                좌상단
+                              </button>
+                              <button
+                                onClick={() => setThumbnailImagePosition(prev => ({...prev, x: 50, y: 25}))}
+                                className="px-2 py-1 bg-gray-200 text-gray-700 text-xs rounded hover:bg-gray-300"
+                              >
+                                상단
+                              </button>
+                              <button
+                                onClick={() => setThumbnailImagePosition(prev => ({...prev, x: 75, y: 25}))}
+                                className="px-2 py-1 bg-gray-200 text-gray-700 text-xs rounded hover:bg-gray-300"
+                              >
+                                우상단
+                              </button>
+                              <button
+                                onClick={() => setThumbnailImagePosition(prev => ({...prev, x: 25, y: 50}))}
+                                className="px-2 py-1 bg-gray-200 text-gray-700 text-xs rounded hover:bg-gray-300"
+                              >
+                                좌측
+                              </button>
+                              <button
+                                onClick={() => setThumbnailImagePosition(prev => ({...prev, x: 50, y: 50}))}
+                                className="px-2 py-1 bg-blue-200 text-blue-700 text-xs rounded hover:bg-blue-300 font-medium"
+                              >
+                                중앙
+                              </button>
+                              <button
+                                onClick={() => setThumbnailImagePosition(prev => ({...prev, x: 75, y: 50}))}
+                                className="px-2 py-1 bg-gray-200 text-gray-700 text-xs rounded hover:bg-gray-300"
+                              >
+                                우측
+                              </button>
+                              <button
+                                onClick={() => setThumbnailImagePosition(prev => ({...prev, x: 25, y: 75}))}
+                                className="px-2 py-1 bg-gray-200 text-gray-700 text-xs rounded hover:bg-gray-300"
+                              >
+                                좌하단
+                              </button>
+                              <button
+                                onClick={() => setThumbnailImagePosition(prev => ({...prev, x: 50, y: 75}))}
+                                className="px-2 py-1 bg-gray-200 text-gray-700 text-xs rounded hover:bg-gray-300"
+                              >
+                                하단
+                              </button>
+                              <button
+                                onClick={() => setThumbnailImagePosition(prev => ({...prev, x: 75, y: 75}))}
+                                className="px-2 py-1 bg-gray-200 text-gray-700 text-xs rounded hover:bg-gray-300"
+                              >
+                                우하단
+                              </button>
+                            </div>
+                          </div>
                         </div>
                       )}
                       
+                      {/* 정밀 위치 조절 */}
+                      <div className="space-y-4 mb-6 p-3 bg-purple-50 rounded-lg border border-purple-200">
+                        <h6 className="font-medium text-sm text-purple-800">🎯 정밀 위치 조절 (드래그 대신)</h6>
+                        
+                        {/* 텍스트 위치 조절 */}
+                        <div className="space-y-3">
+                          <h6 className="text-xs font-medium text-black">📝 텍스트 위치</h6>
+                          <div className="grid grid-cols-2 gap-3">
+                            <div>
+                              <label className="block text-xs text-gray-600 mb-1">가로 위치</label>
+                              <input
+                                type="range"
+                                min="10"
+                                max="90"
+                                value={thumbnailPosition.x}
+                                onChange={(e) => setThumbnailPosition(prev => ({...prev, x: parseInt(e.target.value)}))}
+                                className="w-full"
+                              />
+                              <div className="text-xs text-center text-gray-500">{thumbnailPosition.x}%</div>
+                            </div>
+                            <div>
+                              <label className="block text-xs text-gray-600 mb-1">세로 위치</label>
+                              <input
+                                type="range"
+                                min="10"
+                                max="90"
+                                value={thumbnailPosition.y}
+                                onChange={(e) => setThumbnailPosition(prev => ({...prev, y: parseInt(e.target.value)}))}
+                                className="w-full"
+                              />
+                              <div className="text-xs text-center text-gray-500">{thumbnailPosition.y}%</div>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* 이미지 위치 조절 (이미지가 있을 때만) */}
+                        {thumbnailImage && (
+                          <div className="space-y-3 pt-3 border-t border-purple-200">
+                            <h6 className="text-xs font-medium text-black">🖼️ 이미지 위치 및 크기</h6>
+                            <div className="grid grid-cols-2 gap-3">
+                              <div>
+                                <label className="block text-xs text-gray-600 mb-1">가로 위치</label>
+                                <input
+                                  type="range"
+                                  min="10"
+                                  max="90"
+                                  value={thumbnailImagePosition.x}
+                                  onChange={(e) => setThumbnailImagePosition(prev => ({...prev, x: parseInt(e.target.value)}))}
+                                  className="w-full"
+                                />
+                                <div className="text-xs text-center text-gray-500">{thumbnailImagePosition.x}%</div>
+                              </div>
+                              <div>
+                                <label className="block text-xs text-gray-600 mb-1">세로 위치</label>
+                                <input
+                                  type="range"
+                                  min="10"
+                                  max="90"
+                                  value={thumbnailImagePosition.y}
+                                  onChange={(e) => setThumbnailImagePosition(prev => ({...prev, y: parseInt(e.target.value)}))}
+                                  className="w-full"
+                                />
+                                <div className="text-xs text-center text-gray-500">{thumbnailImagePosition.y}%</div>
+                              </div>
+                            </div>
+                            <div>
+                              <label className="block text-xs text-gray-600 mb-1">이미지 크기</label>
+                              <input
+                                type="range"
+                                min="0.3"
+                                max="8.0"
+                                step="0.1"
+                                value={thumbnailImagePosition.scale}
+                                onChange={(e) => setThumbnailImagePosition(prev => ({...prev, scale: parseFloat(e.target.value)}))}
+                                className="w-full"
+                              />
+                              <div className="text-xs text-center text-gray-500">{Math.round(thumbnailImagePosition.scale * 100)}%</div>
+                            </div>
+                            
+                            {/* 리셋 버튼 */}
+                            <div className="flex gap-2 pt-2">
+                              <button
+                                onClick={() => setThumbnailImagePosition({x: 50, y: 50, scale: 2.7})}
+                                className="flex-1 bg-gray-500 hover:bg-gray-600 text-white text-xs py-2 px-3 rounded font-medium transition-colors"
+                              >
+                                🔄 이미지 리셋
+                              </button>
+                              <button
+                                onClick={() => setThumbnailPosition({x: 50, y: 30})}
+                                className="flex-1 bg-purple-500 hover:bg-purple-600 text-white text-xs py-2 px-3 rounded font-medium transition-colors"
+                              >
+                                📝 텍스트 리셋
+                              </button>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+
                       {/* 위치 프리셋 */}
                       <div className="space-y-3">
                         <h6 className="font-medium text-sm text-black">빠른 위치 설정</h6>
@@ -1431,6 +1635,7 @@ export default function Home() {
                       </div>
                     </div>
                   </div>
+                    </div> {/* Close the 540px container div from line 1241 */}
                   
                   <div className="mt-4 text-center">
                     <div className="text-xs text-purple-600 text-center">
@@ -1463,319 +1668,955 @@ export default function Home() {
             
             {/* 선택된 세그먼트 편집 */}
             {selectedSegmentId && segments.find(s => s.id === selectedSegmentId) && (
-            <div className="bg-white rounded-lg shadow-md p-6 mb-6">
-              {(() => {
+              (() => {
                 const segment = segments.find(s => s.id === selectedSegmentId)!;
-                const index = segments.findIndex(s => s.id === selectedSegmentId);
+                const segmentIndex = segments.findIndex(s => s.id === selectedSegmentId);
+                
                 return (
-                <div className="space-y-6">
-                  <div className="flex items-center justify-between">
-                    <h3 className="text-xl font-semibold text-black">📹 세그먼트 {index + 1} 편집</h3>
-                    <div className="flex gap-2">
-                      <span className={`px-2 py-1 rounded text-xs ${ 
-                        segment.audioUrl ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-black'
-                      }`}>
-                        {segment.audioUrl ? 'TTS 완료' : 'TTS 대기'}
-                      </span>
-                    </div>
-                  </div>
-                  
-                  {/* 2열 레이아웃: 미리보기 + 편집 패널 */}
-                  <div className="grid grid-cols-2 gap-8">
-                    {/* 실시간 미리보기 - 캔버스 크기 */}
-                    <div>
-                      <h4 className="font-medium mb-3 text-black">📱 실시간 미리보기</h4>
-                      <div className="relative bg-black rounded-lg overflow-hidden shadow-2xl mx-auto" style={{ width: '540px', height: '960px' }}>
-                        {/* 배경 이미지 */}
-                        {globalBackgroundImage ? (
-                          <img
-                            src={globalBackgroundImage}
-                            alt="Background"
-                            className="w-full h-full object-cover"
-                          />
-                        ) : (
-                          <div className="w-full h-full bg-black"></div>
-                        )}
-                        
-                        {/* 썸네일 텍스트 */}
-                        {showThumbnailText && (
-                          <div
-                            className="absolute px-4 py-2 cursor-move select-none max-w-[90%] text-center font-bold"
-                            style={{
-                              left: `${thumbnailPosition.x}%`,
-                              top: `${thumbnailPosition.y}%`,
-                              transform: 'translate(-50%, -50%)',
-                              color: thumbnailTextColor,
-                              fontSize: `${thumbnailTextSize * PREVIEW_SCALE}px`, // 미리보기 스케일 적용
-                              textShadow: `${3*PREVIEW_SCALE}px ${3*PREVIEW_SCALE}px ${6*PREVIEW_SCALE}px rgba(0,0,0,0.9)`,
-                            WebkitTextStroke: `${1*PREVIEW_SCALE}px #000000`,
-                              zIndex: 30
-                            }}
-                          >
-                            {thumbnailText}
-                          </div>
-                        )}
-                        
-                        {/* 세그먼트 이미지 */}
-                        {segment.imageUrl && (
-                          <div
-                            className="absolute cursor-move"
-                            style={{
-                              left: `${segment.imagePosition?.x || 50}%`,
-                              top: `${segment.imagePosition?.y || 50}%`,
-                              transform: `translate(-50%, -50%) scale(${segment.imagePosition?.scale || 1})`,
-                              width: '150px', // 기본 크기 증가 (스케일 적용 고려)
-                              height: '100px',
-                              zIndex: 20
-                            }}
-                            onMouseDown={(e) => {
-                              const rect = e.currentTarget.parentElement!.getBoundingClientRect();
-                              const handleMouseMove = (e: MouseEvent) => {
-                                const x = ((e.clientX - rect.left) / rect.width) * 100;
-                                const y = ((e.clientY - rect.top) / rect.height) * 100;
-                                setSegments(prev => prev.map(s => 
-                                  s.id === segment.id ? { 
-                                    ...s, 
-                                    imagePosition: {
-                                      x: Math.max(10, Math.min(90, x)), 
-                                      y: Math.max(10, Math.min(90, y)),
-                                      scale: s.imagePosition?.scale || 1
-                                    }
-                                  } : s
-                                ));
-                              };
-                              const handleMouseUp = () => {
-                                document.removeEventListener('mousemove', handleMouseMove);
-                                document.removeEventListener('mouseup', handleMouseUp);
-                              };
-                              document.addEventListener('mousemove', handleMouseMove);
-                              document.addEventListener('mouseup', handleMouseUp);
-                            }}
-                          >
-                            <img
-                              src={segment.imageUrl}
-                              alt="Segment"
-                              className="w-full h-full object-cover rounded"
-                            />
-                          </div>
-                        )}
-                        
-                        {/* 세그먼트 자막 */}
-                        <div
-                          className="absolute px-3 py-2 cursor-move select-none max-w-[90%] text-center font-bold"
-                          style={{
-                            left: `${segment.subtitlePosition?.x || 50}%`,
-                            top: `${segment.subtitlePosition?.y || 75}%`,
-                            transform: 'translate(-50%, -50%)',
-                            color: segment.textColor || '#ffffff',
-                            fontSize: `${(segment.textSize || 36) * PREVIEW_SCALE}px`, // 미리보기 스케일 적용
-                            textShadow: `${3*PREVIEW_SCALE}px ${3*PREVIEW_SCALE}px ${6*PREVIEW_SCALE}px rgba(0,0,0,0.9)`,
-                            WebkitTextStroke: `${1*PREVIEW_SCALE}px #000000`,
-                            zIndex: 35
-                          }}
-                          onMouseDown={(e) => {
-                            const rect = e.currentTarget.parentElement!.getBoundingClientRect();
-                            const handleMouseMove = (e: MouseEvent) => {
-                              const x = ((e.clientX - rect.left) / rect.width) * 100;
-                              const y = ((e.clientY - rect.top) / rect.height) * 100;
-                              updateSubtitlePosition(segment.id, 
-                                Math.max(10, Math.min(90, x)), 
-                                Math.max(10, Math.min(90, y))
-                              );
-                            };
-                            const handleMouseUp = () => {
-                              document.removeEventListener('mousemove', handleMouseMove);
-                              document.removeEventListener('mouseup', handleMouseUp);
-                            };
-                            document.addEventListener('mousemove', handleMouseMove);
-                            document.addEventListener('mouseup', handleMouseUp);
-                          }}
-                        >
-                          {segment.text}
+                  <div className="bg-white rounded-lg shadow-md p-6 mb-6">
+                    <div className="flex justify-between items-start mb-4">
+                      <div className="flex items-center gap-2">
+                        <div className="cursor-move text-black hover:text-black text-lg">
+                          ⋮⋮
                         </div>
-                      </div>
-                    </div>
-                    
-                    {/* 편집 패널 */}
-                    <div className="space-y-6">
-                      <h4 className="font-medium text-black">🎨 세그먼트 편집</h4>
-                      
-                      {/* 텍스트 편집 */}
-                      <div className="bg-gray-50 p-4 rounded-lg">
-                        <div className="flex justify-between items-center mb-3">
-                          <h5 className="font-medium text-black">텍스트 설정</h5>
-                          <label className="flex items-center text-sm text-black">
-                            <input
-                              type="checkbox"
-                              checked={applyToAllSegments}
-                              onChange={(e) => setApplyToAllSegments(e.target.checked)}
-                              className="mr-2"
-                            />
-                            <span className="text-blue-600">🔄 전체 적용</span>
-                          </label>
-                        </div>
-                        <div className="space-y-4">
-                          <div>
-                            <label className="block text-sm font-medium mb-1 text-black">내용</label>
-                            <textarea
-                              value={segment.text}
-                              onChange={(e) => {
-                                setSegments(prev => prev.map(s => 
-                                  s.id === segment.id ? { ...s, text: e.target.value } : s
-                                ));
-                              }}
-                              className="w-full p-2 border rounded resize-none text-black"
-                              rows={3}
-                            />
-                          </div>
-                          
-                          <div className="grid grid-cols-2 gap-3">
-                            <div>
-                              <label className="block text-sm font-medium mb-1 text-black">크기</label>
-                              <input
-                                type="range"
-                                min="24"
-                                max="72"
-                                value={segment.textSize || 36}
-                                onChange={(e) => updateTextSize(segment.id, parseInt(e.target.value))}
-                                className="w-full"
-                              />
-                              <div className="text-xs text-black text-center">{segment.textSize || 36}px</div>
-                            </div>
+                        <div className="flex-1">
+                          <div className="flex items-center justify-between">
+                            <h3 className="font-medium text-lg text-black">
+                              📹 세그먼트 {segment.order || segmentIndex + 1}
+                            </h3>
                             
-                            <div>
-                              <label className="block text-sm font-medium mb-1 text-black">색상</label>
-                              <input
-                                type="color"
-                                value={segment.textColor || '#ffffff'}
-                                onChange={(e) => updateTextColor(segment.id, e.target.value)}
-                                className="w-full h-8 border rounded"
-                              />
+                            {/* 순서 변경 버튼 */}
+                            <div className="flex gap-1">
+                              {segmentIndex > 0 && (
+                                <button
+                                  onClick={() => moveSegment(segmentIndex, segmentIndex - 1)}
+                                  className="w-8 h-8 flex items-center justify-center bg-blue-100 hover:bg-blue-200 rounded-full text-sm font-bold text-blue-600"
+                                  title="위로 이동"
+                                >
+                                  ↑
+                                </button>
+                              )}
+                              {segmentIndex < segments.length - 1 && (
+                                <button
+                                  onClick={() => moveSegment(segmentIndex, segmentIndex + 1)}
+                                  className="w-8 h-8 flex items-center justify-center bg-blue-100 hover:bg-blue-200 rounded-full text-sm font-bold text-blue-600"
+                                  title="아래로 이동"
+                                >
+                                  ↓
+                                </button>
+                              )}
                             </div>
                           </div>
                           
-                          {applyToAllSegments && (
-                            <div className="bg-blue-50 border border-blue-200 rounded p-2">
-                              <p className="text-xs text-blue-700">
-                                ✅ 색상과 크기 변경이 모든 세그먼트에 적용됩니다.
-                              </p>
+                          {/* 자막 수정 가능한 입력 필드 */}
+                          <div className="mt-2">
+                            <textarea
+                              value={pendingTextChanges[segment.id] !== undefined ? pendingTextChanges[segment.id] : segment.text}
+                              onChange={(e) => {
+                                const newText = e.target.value;
+                                setPendingTextChanges(prev => ({
+                                  ...prev,
+                                  [segment.id]: newText
+                                }));
+                              }}
+                              className="w-full text-sm p-2 border border-gray-300 rounded resize-none"
+                              rows={2}
+                              placeholder="자막 텍스트 입력..."
+                            />
+                            
+                            {/* 변경 확인 버튼 */}
+                            {pendingTextChanges[segment.id] !== undefined && pendingTextChanges[segment.id] !== segment.text && (
+                              <div className="mt-2 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+                                <div className="flex items-center gap-2 mb-2">
+                                  <div className="w-2 h-2 bg-yellow-500 rounded-full"></div>
+                                  <span className="text-sm text-yellow-700 font-medium">자막 변경 확인</span>
+                                </div>
+                                <p className="text-xs text-yellow-600 mb-3">
+                                  ⚠️ 자막을 변경하시겠습니까? 변경 후 TTS 파일을 재생성해야 합니다.
+                                </p>
+                                <div className="flex gap-2">
+                                  <button
+                                    onClick={() => confirmTextChange(segment.id)}
+                                    className="px-3 py-1 bg-yellow-600 text-white text-xs rounded hover:bg-yellow-700"
+                                  >
+                                    변경하기
+                                  </button>
+                                  <button
+                                    onClick={() => {
+                                      setPendingTextChanges(prev => {
+                                        const newPending = { ...prev };
+                                        delete newPending[segment.id];
+                                        return newPending;
+                                      });
+                                    }}
+                                    className="px-3 py-1 bg-gray-300 text-black text-xs rounded hover:bg-gray-400"
+                                  >
+                                    취소
+                                  </button>
+                                </div>
+                              </div>
+                            )}
+                            
+                            {segment.text && segment.audioUrl === undefined && pendingTextChanges[segment.id] === undefined && (
+                              <div className="flex items-center gap-2 mt-1">
+                                <div className="w-2 h-2 bg-orange-500 rounded-full"></div>
+                                <span className="text-xs text-orange-600">텍스트 수정됨 - TTS 재생성 필요</span>
+                              </div>
+                            )}
+                          </div>
+                          
+                          {segment.audioUrl && (
+                            <div className="flex items-center gap-2 mt-2">
+                              <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+                              <span className="text-xs text-green-600">음성 생성 완료</span>
                             </div>
                           )}
                         </div>
                       </div>
-                      
-                      {/* 이미지 편집 */}
-                      {segment.imageUrl && (
-                        <div className="bg-gray-50 p-4 rounded-lg">
-                          <h5 className="font-medium mb-3 text-black">이미지 설정</h5>
-                          <div>
-                            <label className="block text-sm font-medium mb-1 text-black">크기</label>
-                            <input
-                              type="range"
-                              min="0.1"
-                              max="5.0"
-                              step="0.1"
-                              value={segment.imagePosition?.scale || 1}
-                              onChange={(e) => setSegments(prev => prev.map(s => 
-                                s.id === segment.id ? { 
-                                  ...s, 
-                                  imagePosition: {
-                                    ...s.imagePosition,
-                                    x: s.imagePosition?.x || 50,
-                                    y: s.imagePosition?.y || 50,
-                                    scale: parseFloat(e.target.value)
-                                  }
-                                } : s
-                              ))}
-                              className="w-full"
+                    </div>
+
+                    {/* TTS 생성 컨트롤 */}
+                    <div className="mb-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                      <h4 className="font-medium mb-3 text-blue-800">🎵 음성 생성</h4>
+                      <div className="space-y-3">
+                        {!segment.audioUrl && !segment.isGenerating && (
+                          <button
+                            onClick={() => generateTTSForSegment(segment.id, segment.text, selectedVoice)}
+                            disabled={!segment.text.trim()}
+                            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-400 font-medium"
+                          >
+                            TTS 생성
+                          </button>
+                        )}
+                        
+                        {segment.isGenerating && (
+                          <div className="flex items-center gap-2 text-sm text-blue-800">
+                            <div className="animate-spin w-4 h-4 border-2 border-blue-600 border-t-transparent rounded-full"></div>
+                            음성 생성 중...
+                          </div>
+                        )}
+                        
+                        {segment.audioUrl && !segment.isGenerating && (
+                          <div className="space-y-3">
+                            <div className="flex items-center gap-3">
+                              <div className="flex items-center gap-2">
+                                <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+                                <span className="text-sm text-green-600">생성 완료</span>
+                              </div>
+                              <button
+                                onClick={() => generateTTSForSegment(segment.id, segment.text, selectedVoice)}
+                                className="px-3 py-1 bg-orange-600 text-white text-sm rounded hover:bg-orange-700"
+                              >
+                                재생성
+                              </button>
+                            </div>
+                            <AudioPlayer 
+                              audioUrl={segment.audioUrl}
+                              onDurationLoad={(duration) => {
+                                setSegments(prev => prev.map(s => 
+                                  s.id === segment.id ? { ...s, audioDuration: duration } : s
+                                ));
+                              }}
                             />
-                            <div className="text-xs text-black text-center">{Math.round((segment.imagePosition?.scale || 1) * 100)}%</div>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="grid md:grid-cols-2 gap-4">
+                      {/* 메인 이미지 업로드 */}
+                      <div>
+                        <h4 className="font-medium mb-2">메인 이미지</h4>
+                        <p className="text-xs text-black mb-2">영상 중앙에 표시될 이미지 - 업로드 후 크기와 위치를 조절할 수 있습니다</p>
+                        {!segment.imageUrl ? (
+                          <div className="border-2 border-dashed border-blue-300 rounded-lg p-6 text-center bg-blue-50 hover:bg-blue-100 transition-colors">
+                            <input
+                              type="file"
+                              accept="image/*"
+                              onChange={(e) => {
+                                const file = e.target.files?.[0];
+                                if (file) handleImageUpload(segment.id, file);
+                              }}
+                              className="hidden"
+                              id={`image-upload-${segment.id}`}
+                            />
+                            <label
+                              htmlFor={`image-upload-${segment.id}`}
+                              className="cursor-pointer block"
+                            >
+                              <div className="text-blue-600 mb-3 text-2xl">📷</div>
+                              <p className="text-sm text-blue-800 font-medium">세그먼트 {segment.order} 이미지 업로드</p>
+                              <p className="text-xs text-blue-600 mt-1">클릭하여 이미지 선택</p>
+                            </label>
+                          </div>
+                        ) : (
+                          <div className="p-4 bg-green-50 border-2 border-green-300 rounded-lg">
+                            <div className="flex items-start justify-between mb-3">
+                              <div className="flex-1">
+                                <div className="flex items-center gap-2 mb-2">
+                                  <div className="text-green-600 text-lg">✅</div>
+                                  <div>
+                                    <p className="text-sm text-green-800 font-medium">세그먼트 {segment.order} 이미지</p>
+                                    <p className="text-xs text-green-600 truncate max-w-32">{segment.imageName}</p>
+                                  </div>
+                                </div>
+                              </div>
+                              <button
+                                onClick={() => {
+                                  setSegments(prev => prev.map(s => 
+                                    s.id === segment.id ? { ...s, imageUrl: undefined, imageName: undefined } : s
+                                  ));
+                                }}
+                                className="bg-red-500 text-white w-6 h-6 rounded-full text-sm hover:bg-red-600 flex items-center justify-center"
+                                title="이미지 삭제"
+                              >
+                                ×
+                              </button>
+                            </div>
+                            <div className="flex gap-2">
+                              <input
+                                type="file"
+                                accept="image/*"
+                                onChange={(e) => {
+                                  const file = e.target.files?.[0];
+                                  if (file) handleImageUpload(segment.id, file);
+                                }}
+                                className="hidden"
+                                id={`image-replace-${segment.id}`}
+                              />
+                              <label
+                                htmlFor={`image-replace-${segment.id}`}
+                                className="cursor-pointer flex-1 bg-blue-500 hover:bg-blue-600 text-white text-sm py-2 px-4 rounded-lg text-center font-medium transition-colors"
+                              >
+                                🔄 이미지 교체
+                              </label>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* 세그먼트 이미지 크기 및 위치 조절 */}
+                      {segment.imageUrl && (
+                        <div>
+                          <h4 className="font-medium mb-2">이미지 크기 및 위치 조절</h4>
+                          <div className="space-y-3 p-4 bg-gray-50 border border-gray-200 rounded-lg">
+                            <div>
+                              <label className="block text-xs font-medium mb-1 text-black">이미지 크기</label>
+                              <input
+                                type="range"
+                                min="0.3"
+                                max="8.0"
+                                step="0.1"
+                                value={segment.imagePosition?.scale || 1}
+                                onChange={(e) => {
+                                  const newScale = parseFloat(e.target.value);
+                                  setSegments(prev => prev.map(s => 
+                                    s.id === segment.id ? { 
+                                      ...s, 
+                                      imagePosition: {
+                                        x: s.imagePosition?.x || 50,
+                                        y: s.imagePosition?.y || 50,
+                                        scale: newScale
+                                      }
+                                    } : s
+                                  ));
+                                }}
+                                className="w-full"
+                              />
+                              <div className="text-xs text-black text-center mt-1">{Math.round((segment.imagePosition?.scale || 1) * 100)}%</div>
+                            </div>
+
+                            <div>
+                              <label className="block text-xs font-medium mb-2 text-black">위치 조절</label>
+                              <div className="grid grid-cols-3 gap-2">
+                                <button
+                                  onClick={() => setSegments(prev => prev.map(s => 
+                                    s.id === segment.id ? { 
+                                      ...s, 
+                                      imagePosition: {
+                                        ...s.imagePosition,
+                                        x: 25, 
+                                        y: 25,
+                                        scale: s.imagePosition?.scale || 1
+                                      }
+                                    } : s
+                                  ))}
+                                  className="px-2 py-1 bg-gray-200 text-gray-700 text-xs rounded hover:bg-gray-300"
+                                >
+                                  좌상단
+                                </button>
+                                <button
+                                  onClick={() => setSegments(prev => prev.map(s => 
+                                    s.id === segment.id ? { 
+                                      ...s, 
+                                      imagePosition: {
+                                        ...s.imagePosition,
+                                        x: 50, 
+                                        y: 25,
+                                        scale: s.imagePosition?.scale || 1
+                                      }
+                                    } : s
+                                  ))}
+                                  className="px-2 py-1 bg-gray-200 text-gray-700 text-xs rounded hover:bg-gray-300"
+                                >
+                                  중앙상단
+                                </button>
+                                <button
+                                  onClick={() => setSegments(prev => prev.map(s => 
+                                    s.id === segment.id ? { 
+                                      ...s, 
+                                      imagePosition: {
+                                        ...s.imagePosition,
+                                        x: 75, 
+                                        y: 25,
+                                        scale: s.imagePosition?.scale || 1
+                                      }
+                                    } : s
+                                  ))}
+                                  className="px-2 py-1 bg-gray-200 text-gray-700 text-xs rounded hover:bg-gray-300"
+                                >
+                                  우상단
+                                </button>
+                                <button
+                                  onClick={() => setSegments(prev => prev.map(s => 
+                                    s.id === segment.id ? { 
+                                      ...s, 
+                                      imagePosition: {
+                                        ...s.imagePosition,
+                                        x: 25, 
+                                        y: 50,
+                                        scale: s.imagePosition?.scale || 1
+                                      }
+                                    } : s
+                                  ))}
+                                  className="px-2 py-1 bg-gray-200 text-gray-700 text-xs rounded hover:bg-gray-300"
+                                >
+                                  좌중앙
+                                </button>
+                                <button
+                                  onClick={() => setSegments(prev => prev.map(s => 
+                                    s.id === segment.id ? { 
+                                      ...s, 
+                                      imagePosition: {
+                                        ...s.imagePosition,
+                                        x: 50, 
+                                        y: 50,
+                                        scale: s.imagePosition?.scale || 1
+                                      }
+                                    } : s
+                                  ))}
+                                  className="px-2 py-1 bg-blue-200 text-blue-700 text-xs rounded hover:bg-blue-300 font-medium"
+                                >
+                                  중앙
+                                </button>
+                                <button
+                                  onClick={() => setSegments(prev => prev.map(s => 
+                                    s.id === segment.id ? { 
+                                      ...s, 
+                                      imagePosition: {
+                                        ...s.imagePosition,
+                                        x: 75, 
+                                        y: 50,
+                                        scale: s.imagePosition?.scale || 1
+                                      }
+                                    } : s
+                                  ))}
+                                  className="px-2 py-1 bg-gray-200 text-gray-700 text-xs rounded hover:bg-gray-300"
+                                >
+                                  우중앙
+                                </button>
+                                <button
+                                  onClick={() => setSegments(prev => prev.map(s => 
+                                    s.id === segment.id ? { 
+                                      ...s, 
+                                      imagePosition: {
+                                        ...s.imagePosition,
+                                        x: 25, 
+                                        y: 75,
+                                        scale: s.imagePosition?.scale || 1
+                                      }
+                                    } : s
+                                  ))}
+                                  className="px-2 py-1 bg-gray-200 text-gray-700 text-xs rounded hover:bg-gray-300"
+                                >
+                                  좌하단
+                                </button>
+                                <button
+                                  onClick={() => setSegments(prev => prev.map(s => 
+                                    s.id === segment.id ? { 
+                                      ...s, 
+                                      imagePosition: {
+                                        ...s.imagePosition,
+                                        x: 50, 
+                                        y: 75,
+                                        scale: s.imagePosition?.scale || 1
+                                      }
+                                    } : s
+                                  ))}
+                                  className="px-2 py-1 bg-gray-200 text-gray-700 text-xs rounded hover:bg-gray-300"
+                                >
+                                  중앙하단
+                                </button>
+                                <button
+                                  onClick={() => setSegments(prev => prev.map(s => 
+                                    s.id === segment.id ? { 
+                                      ...s, 
+                                      imagePosition: {
+                                        ...s.imagePosition,
+                                        x: 75, 
+                                        y: 75,
+                                        scale: s.imagePosition?.scale || 1
+                                      }
+                                    } : s
+                                  ))}
+                                  className="px-2 py-1 bg-gray-200 text-gray-700 text-xs rounded hover:bg-gray-300"
+                                >
+                                  우하단
+                                </button>
+                              </div>
+                            </div>
+
+                            <div className="flex gap-2 pt-2">
+                              <button
+                                onClick={() => setSegments(prev => prev.map(s => 
+                                  s.id === segment.id ? { 
+                                    ...s, 
+                                    imagePosition: {
+                                      x: 50, 
+                                      y: 50, 
+                                      scale: 2.7
+                                    }
+                                  } : s
+                                ))}
+                                className="flex-1 bg-gray-500 hover:bg-gray-600 text-white text-xs py-2 px-3 rounded font-medium transition-colors"
+                              >
+                                🔄 리셋
+                              </button>
+                              <button
+                                onClick={() => setSegments(prev => prev.map(s => 
+                                  s.id === segment.id ? { 
+                                    ...s, 
+                                    imagePosition: {
+                                      x: s.imagePosition?.x || 50, 
+                                      y: s.imagePosition?.y || 50, 
+                                      scale: 1.0
+                                    }
+                                  } : s
+                                ))}
+                                className="flex-1 bg-blue-500 hover:bg-blue-600 text-white text-xs py-2 px-3 rounded font-medium transition-colors"
+                              >
+                                📏 원본 크기
+                              </button>
+                            </div>
+
+                            <div className="text-xs text-gray-600 bg-white p-2 rounded border">
+                              💡 <strong>팁:</strong> 슬라이더로 크기를 조절하고, 버튼으로 위치를 빠르게 설정하세요. 미리보기에서 이미지를 드래그해서 세밀하게 조정할 수도 있습니다.
+                            </div>
                           </div>
                         </div>
                       )}
-                      
-                      {/* 위치 프리셋 */}
-                      <div className="bg-gray-50 p-4 rounded-lg">
-                        <h5 className="font-medium mb-3 text-black">빠른 위치 설정</h5>
-                        <div className="space-y-3">
-                          <div>
-                            <label className="block text-sm font-medium mb-2 text-black">자막 위치</label>
-                            <div className="grid grid-cols-3 gap-2">
+
+                      {/* 한국형 Shorts 미리보기 */}
+                      {(segment.imageUrl || globalBackgroundImage || showThumbnailText) && (
+                        <div>
+                          <h4 className="font-medium mb-2 text-lg text-black">📱 실시간 Shorts 미리보기</h4>
+                          <p className="text-xs text-black mb-3">썸네일 텍스트 + 세그먼트 이미지 + 자막 최종 미리보기</p>
+                          <p className="text-xs text-blue-600 mb-3 bg-blue-50 p-2 rounded border">
+                            💡 <strong>편집 팁:</strong> 이미지를 드래그하여 이동하거나 더블클릭하여 크기 조절 핸들을 표시할 수 있습니다
+                          </p>
+                          
+                          <div className="relative bg-black overflow-hidden mx-auto shadow-2xl" style={{ width: `${VIDEO_WIDTH * 0.18}px`, height: `${VIDEO_HEIGHT * 0.18}px` }}>
+                            {/* 배경 이미지 또는 검은 배경 */}
+                            {globalBackgroundImage ? (
+                              <img
+                                src={globalBackgroundImage}
+                                alt="Background"
+                                className="w-full h-full object-cover"
+                              />
+                            ) : (
+                              <div className="w-full h-full bg-black"></div>
+                            )}
+                            
+                            {/* 썸네일 텍스트 (전체 세그먼트에 표시) */}
+                            {showThumbnailText && (
+                              <div
+                                className="absolute px-4 py-2 cursor-move select-none max-w-[90%] text-center font-bold"
+                                style={{
+                                  left: `${thumbnailPosition.x}%`,
+                                  top: `${thumbnailPosition.y}%`,
+                                  transform: 'translate(-50%, -50%)',
+                                  color: thumbnailTextColor,
+                                  fontSize: `${(thumbnailTextSize * 0.7) * PREVIEW_SCALE}px`,
+                                  textShadow: `${3*PREVIEW_SCALE}px ${3*PREVIEW_SCALE}px ${6*PREVIEW_SCALE}px rgba(0,0,0,0.9)`,
+                                  WebkitTextStroke: `${1*PREVIEW_SCALE}px #000000`,
+                                  zIndex: 30
+                                }}
+                                onMouseDown={(e) => {
+                                  const rect = e.currentTarget.parentElement!.getBoundingClientRect();
+                                  
+                                  const handleMouseMove = (e: MouseEvent) => {
+                                    const x = ((e.clientX - rect.left) / rect.width) * 100;
+                                    const y = ((e.clientY - rect.top) / rect.height) * 100;
+                                    setThumbnailPosition({
+                                      x: Math.max(10, Math.min(90, x)), 
+                                      y: Math.max(10, Math.min(90, y))
+                                    });
+                                  };
+                                  
+                                  const handleMouseUp = () => {
+                                    document.removeEventListener('mousemove', handleMouseMove);
+                                    document.removeEventListener('mouseup', handleMouseUp);
+                                  };
+                                  
+                                  document.addEventListener('mousemove', handleMouseMove);
+                                  document.addEventListener('mouseup', handleMouseUp);
+                                }}
+                              >
+                                {thumbnailText}
+                              </div>
+                            )}
+
+                            
+                            {/* 세그먼트 메인 이미지 (편집 가능) */}
+                            {segment.imageUrl && (
+                              <div
+                                className={`absolute ${editingImageId === segment.id ? 'cursor-default' : 'cursor-move'}`}
+                                style={{
+                                  left: `${segment.imagePosition?.x || 50}%`,
+                                  top: `${segment.imagePosition?.y || 50}%`,
+                                  transform: `translate(-50%, -50%) scale(${segment.imagePosition?.scale || 1})`,
+                                  width: `${BASE_IMAGE_WIDTH * PREVIEW_SCALE}px`,
+                                  height: `${BASE_IMAGE_HEIGHT * PREVIEW_SCALE}px`,
+                                  zIndex: 20
+                                }}
+                                onDoubleClick={() => setEditingImageId(editingImageId === segment.id ? null : segment.id)}
+                                onMouseDown={(e) => {
+                                  if (editingImageId === segment.id) return;
+                                  e.preventDefault();
+                                  e.stopPropagation();
+                                  
+                                  const container = e.currentTarget.closest('.relative.bg-black');
+                                  if (!container) return;
+                                  
+                                  const rect = container.getBoundingClientRect();
+                                  const startX = e.clientX;
+                                  const startY = e.clientY;
+                                  const startPosX = segment.imagePosition?.x || 50;
+                                  const startPosY = segment.imagePosition?.y || 50;
+                                  
+                                  const handleMouseMove = (e: MouseEvent) => {
+                                    const deltaX = ((e.clientX - startX) / rect.width) * 100;
+                                    const deltaY = ((e.clientY - startY) / rect.height) * 100;
+                                    
+                                    const newX = Math.max(5, Math.min(95, startPosX + deltaX));
+                                    const newY = Math.max(5, Math.min(95, startPosY + deltaY));
+                                    
+                                    setSegments(prev => prev.map(s => 
+                                      s.id === segment.id ? { 
+                                        ...s, 
+                                        imagePosition: {
+                                          x: newX,
+                                          y: newY,
+                                          scale: s.imagePosition?.scale || 1
+                                        }
+                                      } : s
+                                    ));
+                                  };
+                                  
+                                  const handleMouseUp = () => {
+                                    document.removeEventListener('mousemove', handleMouseMove);
+                                    document.removeEventListener('mouseup', handleMouseUp);
+                                  };
+                                  
+                                  document.addEventListener('mousemove', handleMouseMove);
+                                  document.addEventListener('mouseup', handleMouseUp);
+                                }}
+                              >
+                                <img
+                                  src={segment.imageUrl}
+                                  alt="Segment"
+                                  className="w-full h-full object-contain border-2 border-white/20"
+                                />
+                                
+                                {/* 편집 모드 - 리사이즈 핸들과 테두리 */}
+                                {editingImageId === segment.id && (
+                                  <>
+                                    {/* 편집 모드 테두리 */}
+                                    <div className="absolute inset-0 border-2 border-blue-500 pointer-events-none"></div>
+                                    
+                                    {/* 모서리 핸들들 */}
+                                    <div 
+                                      className="absolute -top-2 -left-2 w-4 h-4 bg-blue-500 border-2 border-white rounded-full cursor-nw-resize shadow-lg"
+                                      onMouseDown={(e) => {
+                                        e.stopPropagation();
+                                        const startScale = segment.imagePosition?.scale || 1;
+                                        const startX = e.clientX;
+                                        const startY = e.clientY;
+                                        
+                                        const handleResize = (e: MouseEvent) => {
+                                          const deltaX = e.clientX - startX;
+                                          const deltaY = e.clientY - startY;
+                                          const avgDelta = (deltaX + deltaY) / 2;
+                                          const scaleChange = avgDelta / 100;
+                                          const newScale = Math.max(0.3, Math.min(8, startScale + scaleChange));
+                                          
+                                          setSegments(prev => prev.map(s => 
+                                            s.id === segment.id ? { 
+                                              ...s, 
+                                              imagePosition: { ...s.imagePosition, scale: newScale, x: s.imagePosition?.x || 50, y: s.imagePosition?.y || 50 }
+                                            } : s
+                                          ));
+                                        };
+                                        
+                                        const handleResizeEnd = () => {
+                                          document.removeEventListener('mousemove', handleResize);
+                                          document.removeEventListener('mouseup', handleResizeEnd);
+                                        };
+                                        
+                                        document.addEventListener('mousemove', handleResize);
+                                        document.addEventListener('mouseup', handleResizeEnd);
+                                      }}
+                                    ></div>
+                                    
+                                    <div 
+                                      className="absolute -top-2 -right-2 w-4 h-4 bg-blue-500 border-2 border-white rounded-full cursor-ne-resize shadow-lg"
+                                      onMouseDown={(e) => {
+                                        e.stopPropagation();
+                                        const startScale = segment.imagePosition?.scale || 1;
+                                        const startX = e.clientX;
+                                        const startY = e.clientY;
+                                        
+                                        const handleResize = (e: MouseEvent) => {
+                                          const deltaX = e.clientX - startX;
+                                          const deltaY = -(e.clientY - startY);
+                                          const avgDelta = (deltaX + deltaY) / 2;
+                                          const scaleChange = avgDelta / 100;
+                                          const newScale = Math.max(0.3, Math.min(8, startScale + scaleChange));
+                                          
+                                          setSegments(prev => prev.map(s => 
+                                            s.id === segment.id ? { 
+                                              ...s, 
+                                              imagePosition: { ...s.imagePosition, scale: newScale, x: s.imagePosition?.x || 50, y: s.imagePosition?.y || 50 }
+                                            } : s
+                                          ));
+                                        };
+                                        
+                                        const handleResizeEnd = () => {
+                                          document.removeEventListener('mousemove', handleResize);
+                                          document.removeEventListener('mouseup', handleResizeEnd);
+                                        };
+                                        
+                                        document.addEventListener('mousemove', handleResize);
+                                        document.addEventListener('mouseup', handleResizeEnd);
+                                      }}
+                                    ></div>
+                                    
+                                    {/* Southeast Handle (우하단) */}
+                                    <div 
+                                      className="absolute -bottom-2 -right-2 w-4 h-4 bg-blue-500 border-2 border-white rounded-full cursor-se-resize shadow-lg"
+                                      onMouseDown={(e) => {
+                                        e.stopPropagation();
+                                        const startX = e.clientX;
+                                        const startY = e.clientY;
+                                        const startScale = segment.imagePosition?.scale || 1;
+                                        
+                                        const handleMouseMove = (e: MouseEvent) => {
+                                          const deltaX = e.clientX - startX;
+                                          const deltaY = e.clientY - startY;
+                                          const avgDelta = (deltaX + deltaY) / 2;
+                                          const scaleChange = avgDelta / 100;
+                                          const newScale = Math.max(0.3, Math.min(8, startScale + scaleChange));
+                                          
+                                          setSegments(prev => prev.map(s => 
+                                            s.id === segment.id ? { 
+                                              ...s, 
+                                              imagePosition: { 
+                                                ...s.imagePosition, 
+                                                scale: newScale, 
+                                                x: s.imagePosition?.x || 50, 
+                                                y: s.imagePosition?.y || 50 
+                                              }
+                                            } : s
+                                          ));
+                                        };
+                                        
+                                        const handleMouseUp = () => {
+                                          document.removeEventListener('mousemove', handleMouseMove);
+                                          document.removeEventListener('mouseup', handleMouseUp);
+                                        };
+                                        
+                                        document.addEventListener('mousemove', handleMouseMove);
+                                        document.addEventListener('mouseup', handleMouseUp);
+                                      }}
+                                    ></div>
+                                    
+                                    {/* Southwest Handle (좌하단) */}
+                                    <div 
+                                      className="absolute -bottom-2 -left-2 w-4 h-4 bg-blue-500 border-2 border-white rounded-full cursor-sw-resize shadow-lg"
+                                      onMouseDown={(e) => {
+                                        e.stopPropagation();
+                                        const startX = e.clientX;
+                                        const startY = e.clientY;
+                                        const startScale = segment.imagePosition?.scale || 1;
+                                        
+                                        const handleMouseMove = (e: MouseEvent) => {
+                                          const deltaX = -(e.clientX - startX);
+                                          const deltaY = e.clientY - startY;
+                                          const avgDelta = (deltaX + deltaY) / 2;
+                                          const scaleChange = avgDelta / 100;
+                                          const newScale = Math.max(0.3, Math.min(8, startScale + scaleChange));
+                                          
+                                          setSegments(prev => prev.map(s => 
+                                            s.id === segment.id ? { 
+                                              ...s, 
+                                              imagePosition: { 
+                                                ...s.imagePosition, 
+                                                scale: newScale, 
+                                                x: s.imagePosition?.x || 50, 
+                                                y: s.imagePosition?.y || 50 
+                                              }
+                                            } : s
+                                          ));
+                                        };
+                                        
+                                        const handleMouseUp = () => {
+                                          document.removeEventListener('mousemove', handleMouseMove);
+                                          document.removeEventListener('mouseup', handleMouseUp);
+                                        };
+                                        
+                                        document.addEventListener('mousemove', handleMouseMove);
+                                        document.addEventListener('mouseup', handleMouseUp);
+                                      }}
+                                    ></div>
+                                    
+                                    {/* Top Edge Handle (상단 가장자리) */}
+                                    <div 
+                                      className="absolute -top-2 left-1/2 transform -translate-x-1/2 w-4 h-4 bg-blue-500 border-2 border-white rounded-full cursor-n-resize shadow-lg"
+                                      onMouseDown={(e) => {
+                                        e.stopPropagation();
+                                        const startY = e.clientY;
+                                        const startScale = segment.imagePosition?.scale || 1;
+                                        
+                                        const handleMouseMove = (e: MouseEvent) => {
+                                          const deltaY = -(e.clientY - startY);
+                                          const scaleChange = deltaY / 100;
+                                          const newScale = Math.max(0.3, Math.min(8, startScale + scaleChange));
+                                          
+                                          setSegments(prev => prev.map(s => 
+                                            s.id === segment.id ? { 
+                                              ...s, 
+                                              imagePosition: { 
+                                                ...s.imagePosition, 
+                                                scale: newScale, 
+                                                x: s.imagePosition?.x || 50, 
+                                                y: s.imagePosition?.y || 50 
+                                              }
+                                            } : s
+                                          ));
+                                        };
+                                        
+                                        const handleMouseUp = () => {
+                                          document.removeEventListener('mousemove', handleMouseMove);
+                                          document.removeEventListener('mouseup', handleMouseUp);
+                                        };
+                                        
+                                        document.addEventListener('mousemove', handleMouseMove);
+                                        document.addEventListener('mouseup', handleMouseUp);
+                                      }}
+                                    ></div>
+                                    
+                                    {/* Bottom Edge Handle (하단 가장자리) */}
+                                    <div 
+                                      className="absolute -bottom-2 left-1/2 transform -translate-x-1/2 w-4 h-4 bg-blue-500 border-2 border-white rounded-full cursor-s-resize shadow-lg"
+                                      onMouseDown={(e) => {
+                                        e.stopPropagation();
+                                        const startY = e.clientY;
+                                        const startScale = segment.imagePosition?.scale || 1;
+                                        
+                                        const handleMouseMove = (e: MouseEvent) => {
+                                          const deltaY = e.clientY - startY;
+                                          const scaleChange = deltaY / 100;
+                                          const newScale = Math.max(0.3, Math.min(8, startScale + scaleChange));
+                                          
+                                          setSegments(prev => prev.map(s => 
+                                            s.id === segment.id ? { 
+                                              ...s, 
+                                              imagePosition: { 
+                                                ...s.imagePosition, 
+                                                scale: newScale, 
+                                                x: s.imagePosition?.x || 50, 
+                                                y: s.imagePosition?.y || 50 
+                                              }
+                                            } : s
+                                          ));
+                                        };
+                                        
+                                        const handleMouseUp = () => {
+                                          document.removeEventListener('mousemove', handleMouseMove);
+                                          document.removeEventListener('mouseup', handleMouseUp);
+                                        };
+                                        
+                                        document.addEventListener('mousemove', handleMouseMove);
+                                        document.addEventListener('mouseup', handleMouseUp);
+                                      }}
+                                    ></div>
+                                    
+                                    {/* Left Edge Handle (좌측 가장자리) */}
+                                    <div 
+                                      className="absolute -left-2 top-1/2 transform -translate-y-1/2 w-4 h-4 bg-blue-500 border-2 border-white rounded-full cursor-w-resize shadow-lg"
+                                      onMouseDown={(e) => {
+                                        e.stopPropagation();
+                                        const startX = e.clientX;
+                                        const startScale = segment.imagePosition?.scale || 1;
+                                        
+                                        const handleMouseMove = (e: MouseEvent) => {
+                                          const deltaX = -(e.clientX - startX);
+                                          const scaleChange = deltaX / 100;
+                                          const newScale = Math.max(0.3, Math.min(8, startScale + scaleChange));
+                                          
+                                          setSegments(prev => prev.map(s => 
+                                            s.id === segment.id ? { 
+                                              ...s, 
+                                              imagePosition: { 
+                                                ...s.imagePosition, 
+                                                scale: newScale, 
+                                                x: s.imagePosition?.x || 50, 
+                                                y: s.imagePosition?.y || 50 
+                                              }
+                                            } : s
+                                          ));
+                                        };
+                                        
+                                        const handleMouseUp = () => {
+                                          document.removeEventListener('mousemove', handleMouseMove);
+                                          document.removeEventListener('mouseup', handleMouseUp);
+                                        };
+                                        
+                                        document.addEventListener('mousemove', handleMouseMove);
+                                        document.addEventListener('mouseup', handleMouseUp);
+                                      }}
+                                    ></div>
+                                    
+                                    {/* Right Edge Handle (우측 가장자리) */}
+                                    <div 
+                                      className="absolute -right-2 top-1/2 transform -translate-y-1/2 w-4 h-4 bg-blue-500 border-2 border-white rounded-full cursor-e-resize shadow-lg"
+                                      onMouseDown={(e) => {
+                                        e.stopPropagation();
+                                        const startX = e.clientX;
+                                        const startScale = segment.imagePosition?.scale || 1;
+                                        
+                                        const handleMouseMove = (e: MouseEvent) => {
+                                          const deltaX = e.clientX - startX;
+                                          const scaleChange = deltaX / 100;
+                                          const newScale = Math.max(0.3, Math.min(8, startScale + scaleChange));
+                                          
+                                          setSegments(prev => prev.map(s => 
+                                            s.id === segment.id ? { 
+                                              ...s, 
+                                              imagePosition: { 
+                                                ...s.imagePosition, 
+                                                scale: newScale, 
+                                                x: s.imagePosition?.x || 50, 
+                                                y: s.imagePosition?.y || 50 
+                                              }
+                                            } : s
+                                          ));
+                                        };
+                                        
+                                        const handleMouseUp = () => {
+                                          document.removeEventListener('mousemove', handleMouseMove);
+                                          document.removeEventListener('mouseup', handleMouseUp);
+                                        };
+                                        
+                                        document.addEventListener('mousemove', handleMouseMove);
+                                        document.addEventListener('mouseup', handleMouseUp);
+                                      }}
+                                    ></div>
+                                    
+                                    {/* 편집 안내 */}
+                                    <div className="absolute -top-10 left-1/2 transform -translate-x-1/2 bg-blue-600 text-white px-3 py-1 rounded text-xs whitespace-nowrap shadow-lg">
+                                      ✨ 편집 모드 • 모서리 드래그로 크기 조절 • 스케일: {(segment.imagePosition?.scale || 1).toFixed(1)}x
+                                    </div>
+                                  </>
+                                )}
+                              </div>
+                            )}
+                            
+                            {/* 세그먼트 자막 */}
+                            <div
+                              className="absolute px-3 py-2 cursor-move select-none max-w-[90%] text-center font-bold"
+                              style={{
+                                left: `${segment.subtitlePosition?.x || 50}%`,
+                                top: `${segment.subtitlePosition?.y || 75}%`,
+                                transform: 'translate(-50%, -50%)',
+                                color: segment.textColor || '#ffffff',
+                                fontSize: `${(segment.textSize || 36) * PREVIEW_SCALE}px`,
+                                textShadow: `${3*PREVIEW_SCALE}px ${3*PREVIEW_SCALE}px ${6*PREVIEW_SCALE}px rgba(0,0,0,0.9)`,
+                                WebkitTextStroke: `${1*PREVIEW_SCALE}px #000000`,
+                                zIndex: 35
+                              }}
+                              onMouseDown={(e) => {
+                                const rect = e.currentTarget.parentElement!.getBoundingClientRect();
+                                
+                                const handleMouseMove = (e: MouseEvent) => {
+                                  const x = ((e.clientX - rect.left) / rect.width) * 100;
+                                  const y = ((e.clientY - rect.top) / rect.height) * 100;
+                                  updateSubtitlePosition(segment.id, 
+                                    Math.max(10, Math.min(90, x)), 
+                                    Math.max(10, Math.min(90, y))
+                                  );
+                                };
+                                
+                                const handleMouseUp = () => {
+                                  document.removeEventListener('mousemove', handleMouseMove);
+                                  document.removeEventListener('mouseup', handleMouseUp);
+                                };
+                                
+                                document.addEventListener('mousemove', handleMouseMove);
+                                document.addEventListener('mouseup', handleMouseUp);
+                              }}
+                            >
+                              {segment.text}
+                            </div>
+                          </div>
+                          
+                          <div className="mt-4 space-y-2">
+                            <div className="text-xs text-black space-y-1">
+                              <p><span className="inline-block w-3 h-3 bg-purple-400 rounded mr-2"></span>썸네일 텍스트 (모든 세그먼트에 표시)</p>
+                              <p><span className="inline-block w-3 h-3 bg-blue-400 rounded mr-2"></span>세그먼트 이미지 (드래그로 이동 가능)</p>
+                              <p><span className="inline-block w-3 h-3 bg-green-400 rounded mr-2"></span>세그먼트 자막 (드래그로 이동 가능)</p>
+                              <p className="text-purple-600">💡 썸네일 이미지는 별도 썸네일 전용으로만 사용</p>
+                            </div>
+                            
+                            {/* 위치 프리셋 */}
+                            <div className="flex gap-2 flex-wrap">
+                              <span className="text-xs font-medium">자막 위치:</span>
                               <button
                                 onClick={() => updateSubtitlePosition(segment.id, 50, 20)}
-                                className="px-2 py-1 bg-blue-100 text-blue-800 text-xs rounded hover:bg-blue-200"
+                                className="px-2 py-1 bg-green-100 text-green-800 text-xs rounded hover:bg-green-200"
                               >
                                 상단
                               </button>
                               <button
                                 onClick={() => updateSubtitlePosition(segment.id, 50, 50)}
-                                className="px-2 py-1 bg-blue-100 text-blue-800 text-xs rounded hover:bg-blue-200"
+                                className="px-2 py-1 bg-green-100 text-green-800 text-xs rounded hover:bg-green-200"
                               >
                                 중앙
                               </button>
                               <button
                                 onClick={() => updateSubtitlePosition(segment.id, 50, 80)}
-                                className="px-2 py-1 bg-blue-100 text-blue-800 text-xs rounded hover:bg-blue-200"
+                                className="px-2 py-1 bg-green-100 text-green-800 text-xs rounded hover:bg-green-200"
                               >
                                 하단
                               </button>
                             </div>
                           </div>
-                          
-                          {/* 이미지 편집 컨트롤 */}
-                          {segment.imageUrl && (
-                            <div>
-                              <label className="block text-sm font-medium mb-2 text-black">이미지 편집</label>
-                              <div className="grid grid-cols-2 gap-2">
-                                <button
-                                  onClick={() => {
-                                    const newEditingId = editingImageId === segment.id ? null : segment.id;
-                                    console.log('편집 모드 변경:', editingImageId, '->', newEditingId);
-                                    setEditingImageId(newEditingId);
-                                  }}
-                                  className={`px-3 py-2 text-xs rounded font-medium ${
-                                    editingImageId === segment.id 
-                                      ? 'bg-red-500 text-white hover:bg-red-600' 
-                                      : 'bg-green-500 text-white hover:bg-green-600'
-                                  }`}
-                                >
-                                  {editingImageId === segment.id ? '편집 완료' : '🖼️ 이미지 편집'}
-                                </button>
-                                <button
-                                  onClick={() => {
-                                    setSegments(prev => prev.map(s => 
-                                      s.id === segment.id ? { 
-                                        ...s, 
-                                        imagePosition: { x: 50, y: 50, scale: 1.8 } // 기본값으로 리셋
-                                      } : s
-                                    ));
-                                  }}
-                                  className="px-3 py-2 bg-gray-500 text-white text-xs rounded hover:bg-gray-600 font-medium"
-                                >
-                                  🔄 위치 리셋
-                                </button>
-                              </div>
-                              
-                              {editingImageId === segment.id && (
-                                <div className="mt-2 p-2 bg-blue-50 rounded text-xs text-blue-700">
-                                  💡 미리보기에서 이미지를 드래그하여 위치를 조정하고, 모서리 핸들을 드래그하여 크기를 조절하세요.
-                                </div>
-                              )}
-                              
-                              {/* 디버깅 정보 */}
-                              <div className="mt-2 p-1 bg-gray-100 rounded text-xs text-gray-600">
-                                디버그: editingImageId = {editingImageId || 'null'}, segment.id = {segment.id}
-                              </div>
-                            </div>
-                          )}
                         </div>
-                      </div>
+                      )}
                     </div>
                   </div>
-                </div>
                 );
-              })()}
-            </div>
+              })()
             )}
             
             {/* 기존 세그먼트들은 숨김 처리하고 선택된 것만 표시 */}
@@ -1909,7 +2750,7 @@ export default function Home() {
                       <h4 className="font-medium mb-2">메인 이미지</h4>
                       <p className="text-xs text-black mb-2">영상 중앙에 표시될 이미지</p>
                       {!segment.imageUrl ? (
-                        <div className="border-2 border-dashed border-gray-300 rounded-lg p-4 text-center">
+                        <div className="border-2 border-dashed border-blue-300 rounded-lg p-6 text-center bg-blue-50 hover:bg-blue-100 transition-colors">
                           <input
                             type="file"
                             accept="image/*"
@@ -1924,16 +2765,22 @@ export default function Home() {
                             htmlFor={`image-upload-${segment.id}`}
                             className="cursor-pointer block"
                           >
-                            <div className="text-black mb-2">📷</div>
-                            <p className="text-xs text-black">메인 이미지 업로드</p>
+                            <div className="text-blue-600 mb-3 text-2xl">📷</div>
+                            <p className="text-sm text-blue-800 font-medium">세그먼트 {segment.order} 이미지 업로드</p>
+                            <p className="text-xs text-blue-600 mt-1">클릭하여 이미지 선택</p>
                           </label>
                         </div>
                       ) : (
-                        <div className="p-3 bg-gray-100 border-2 border-gray-300 rounded">
-                          <div className="flex items-center justify-between">
-                            <div>
-                              <div className="text-black mb-1">📷</div>
-                              <p className="text-xs text-black font-medium">{segment.imageName}</p>
+                        <div className="p-4 bg-green-50 border-2 border-green-300 rounded-lg">
+                          <div className="flex items-start justify-between mb-3">
+                            <div className="flex-1">
+                              <div className="flex items-center gap-2 mb-2">
+                                <div className="text-green-600 text-lg">✅</div>
+                                <div>
+                                  <p className="text-sm text-green-800 font-medium">세그먼트 {segment.order} 이미지</p>
+                                  <p className="text-xs text-green-600 truncate max-w-32">{segment.imageName}</p>
+                                </div>
+                              </div>
                             </div>
                             <button
                               onClick={() => {
@@ -1941,10 +2788,250 @@ export default function Home() {
                                   s.id === segment.id ? { ...s, imageUrl: undefined, imageName: undefined } : s
                                 ));
                               }}
-                              className="bg-red-500 text-white w-5 h-5 rounded-full text-xs hover:bg-red-600"
+                              className="bg-red-500 text-white w-6 h-6 rounded-full text-sm hover:bg-red-600 flex items-center justify-center"
+                              title="이미지 삭제"
                             >
                               ×
                             </button>
+                          </div>
+                          <div className="flex gap-2">
+                            <input
+                              type="file"
+                              accept="image/*"
+                              onChange={(e) => {
+                                const file = e.target.files?.[0];
+                                if (file) handleImageUpload(segment.id, file);
+                              }}
+                              className="hidden"
+                              id={`image-replace-${segment.id}`}
+                            />
+                            <label
+                              htmlFor={`image-replace-${segment.id}`}
+                              className="cursor-pointer flex-1 bg-blue-500 hover:bg-blue-600 text-white text-sm py-2 px-4 rounded-lg text-center font-medium transition-colors"
+                            >
+                              🔄 이미지 교체
+                            </label>
+                          </div>
+                        </div>
+                      )}
+                      
+                      {/* 세그먼트 이미지 크기 및 위치 조절 */}
+                      {segment.imageUrl && (
+                        <div className="mt-4">
+                          <h4 className="font-medium mb-2">이미지 크기 및 위치 조절</h4>
+                          <div className="space-y-3 p-4 bg-gray-50 border border-gray-200 rounded-lg">
+                            <div>
+                              <label className="block text-xs font-medium mb-1 text-black">이미지 크기</label>
+                              <input
+                                type="range"
+                                min="0.3"
+                                max="8.0"
+                                step="0.1"
+                                value={segment.imagePosition?.scale || 1}
+                                onChange={(e) => {
+                                  const newScale = parseFloat(e.target.value);
+                                  setSegments(prev => prev.map(s => 
+                                    s.id === segment.id ? { 
+                                      ...s, 
+                                      imagePosition: {
+                                        x: s.imagePosition?.x || 50,
+                                        y: s.imagePosition?.y || 50,
+                                        scale: newScale
+                                      }
+                                    } : s
+                                  ));
+                                }}
+                                className="w-full"
+                              />
+                              <div className="text-xs text-black text-center mt-1">{Math.round((segment.imagePosition?.scale || 1) * 100)}%</div>
+                            </div>
+
+                            <div>
+                              <label className="block text-xs font-medium mb-2 text-black">위치 조절</label>
+                              <div className="grid grid-cols-3 gap-2">
+                                <button
+                                  onClick={() => setSegments(prev => prev.map(s => 
+                                    s.id === segment.id ? { 
+                                      ...s, 
+                                      imagePosition: {
+                                        ...s.imagePosition,
+                                        x: 25, 
+                                        y: 25,
+                                        scale: s.imagePosition?.scale || 1
+                                      }
+                                    } : s
+                                  ))}
+                                  className="px-2 py-1 bg-gray-200 text-gray-700 text-xs rounded hover:bg-gray-300"
+                                >
+                                  좌상단
+                                </button>
+                                <button
+                                  onClick={() => setSegments(prev => prev.map(s => 
+                                    s.id === segment.id ? { 
+                                      ...s, 
+                                      imagePosition: {
+                                        ...s.imagePosition,
+                                        x: 50, 
+                                        y: 25,
+                                        scale: s.imagePosition?.scale || 1
+                                      }
+                                    } : s
+                                  ))}
+                                  className="px-2 py-1 bg-gray-200 text-gray-700 text-xs rounded hover:bg-gray-300"
+                                >
+                                  중앙상단
+                                </button>
+                                <button
+                                  onClick={() => setSegments(prev => prev.map(s => 
+                                    s.id === segment.id ? { 
+                                      ...s, 
+                                      imagePosition: {
+                                        ...s.imagePosition,
+                                        x: 75, 
+                                        y: 25,
+                                        scale: s.imagePosition?.scale || 1
+                                      }
+                                    } : s
+                                  ))}
+                                  className="px-2 py-1 bg-gray-200 text-gray-700 text-xs rounded hover:bg-gray-300"
+                                >
+                                  우상단
+                                </button>
+                                <button
+                                  onClick={() => setSegments(prev => prev.map(s => 
+                                    s.id === segment.id ? { 
+                                      ...s, 
+                                      imagePosition: {
+                                        ...s.imagePosition,
+                                        x: 25, 
+                                        y: 50,
+                                        scale: s.imagePosition?.scale || 1
+                                      }
+                                    } : s
+                                  ))}
+                                  className="px-2 py-1 bg-gray-200 text-gray-700 text-xs rounded hover:bg-gray-300"
+                                >
+                                  좌중앙
+                                </button>
+                                <button
+                                  onClick={() => setSegments(prev => prev.map(s => 
+                                    s.id === segment.id ? { 
+                                      ...s, 
+                                      imagePosition: {
+                                        ...s.imagePosition,
+                                        x: 50, 
+                                        y: 50,
+                                        scale: s.imagePosition?.scale || 1
+                                      }
+                                    } : s
+                                  ))}
+                                  className="px-2 py-1 bg-blue-200 text-blue-700 text-xs rounded hover:bg-blue-300 font-medium"
+                                >
+                                  중앙
+                                </button>
+                                <button
+                                  onClick={() => setSegments(prev => prev.map(s => 
+                                    s.id === segment.id ? { 
+                                      ...s, 
+                                      imagePosition: {
+                                        ...s.imagePosition,
+                                        x: 75, 
+                                        y: 50,
+                                        scale: s.imagePosition?.scale || 1
+                                      }
+                                    } : s
+                                  ))}
+                                  className="px-2 py-1 bg-gray-200 text-gray-700 text-xs rounded hover:bg-gray-300"
+                                >
+                                  우중앙
+                                </button>
+                                <button
+                                  onClick={() => setSegments(prev => prev.map(s => 
+                                    s.id === segment.id ? { 
+                                      ...s, 
+                                      imagePosition: {
+                                        ...s.imagePosition,
+                                        x: 25, 
+                                        y: 75,
+                                        scale: s.imagePosition?.scale || 1
+                                      }
+                                    } : s
+                                  ))}
+                                  className="px-2 py-1 bg-gray-200 text-gray-700 text-xs rounded hover:bg-gray-300"
+                                >
+                                  좌하단
+                                </button>
+                                <button
+                                  onClick={() => setSegments(prev => prev.map(s => 
+                                    s.id === segment.id ? { 
+                                      ...s, 
+                                      imagePosition: {
+                                        ...s.imagePosition,
+                                        x: 50, 
+                                        y: 75,
+                                        scale: s.imagePosition?.scale || 1
+                                      }
+                                    } : s
+                                  ))}
+                                  className="px-2 py-1 bg-gray-200 text-gray-700 text-xs rounded hover:bg-gray-300"
+                                >
+                                  중앙하단
+                                </button>
+                                <button
+                                  onClick={() => setSegments(prev => prev.map(s => 
+                                    s.id === segment.id ? { 
+                                      ...s, 
+                                      imagePosition: {
+                                        ...s.imagePosition,
+                                        x: 75, 
+                                        y: 75,
+                                        scale: s.imagePosition?.scale || 1
+                                      }
+                                    } : s
+                                  ))}
+                                  className="px-2 py-1 bg-gray-200 text-gray-700 text-xs rounded hover:bg-gray-300"
+                                >
+                                  우하단
+                                </button>
+                              </div>
+                            </div>
+
+                            <div className="flex gap-2 pt-2">
+                              <button
+                                onClick={() => setSegments(prev => prev.map(s => 
+                                  s.id === segment.id ? { 
+                                    ...s, 
+                                    imagePosition: {
+                                      x: 50, 
+                                      y: 50, 
+                                      scale: 2.7
+                                    }
+                                  } : s
+                                ))}
+                                className="flex-1 bg-gray-500 hover:bg-gray-600 text-white text-xs py-2 px-3 rounded font-medium transition-colors"
+                              >
+                                🔄 리셋
+                              </button>
+                              <button
+                                onClick={() => setSegments(prev => prev.map(s => 
+                                  s.id === segment.id ? { 
+                                    ...s, 
+                                    imagePosition: {
+                                      x: s.imagePosition?.x || 50, 
+                                      y: s.imagePosition?.y || 50, 
+                                      scale: 1.0
+                                    }
+                                  } : s
+                                ))}
+                                className="flex-1 bg-blue-500 hover:bg-blue-600 text-white text-xs py-2 px-3 rounded font-medium transition-colors"
+                              >
+                                📏 원본 크기
+                              </button>
+                            </div>
+
+                            <div className="text-xs text-gray-600 bg-white p-2 rounded border">
+                              💡 <strong>팁:</strong> 슬라이더로 크기를 조절하고, 버튼으로 위치를 빠르게 설정하세요. 미리보기에서 이미지를 드래그해서 세밀하게 조정할 수도 있습니다.
+                            </div>
                           </div>
                         </div>
                       )}
@@ -1956,8 +3043,11 @@ export default function Home() {
                       <div>
                         <h4 className="font-medium mb-2 text-lg text-black">📱 실시간 Shorts 미리보기</h4>
                         <p className="text-xs text-black mb-3">썸네일 텍스트 + 세그먼트 이미지 + 자막 최종 미리보기</p>
+                        <p className="text-xs text-blue-600 mb-3 bg-blue-50 p-2 rounded border">
+                          💡 <strong>편집 팁:</strong> 이미지를 드래그하여 이동하거나 더블클릭하여 크기 조절 핸들을 표시할 수 있습니다
+                        </p>
                         
-                        <div className="relative bg-black rounded-lg overflow-hidden mx-auto shadow-2xl" style={{ aspectRatio: '9/16', height: '350px' }}>
+                        <div className="relative bg-black overflow-hidden mx-auto shadow-2xl" style={{ width: `${VIDEO_WIDTH * 0.18}px`, height: `${VIDEO_HEIGHT * 0.18}px` }}>
                           {/* 배경 이미지 또는 검은 배경 */}
                           {globalBackgroundImage ? (
                             <img
@@ -2017,25 +3107,39 @@ export default function Home() {
                                 left: `${segment.imagePosition?.x || 50}%`,
                                 top: `${segment.imagePosition?.y || 50}%`,
                                 transform: `translate(-50%, -50%) scale(${segment.imagePosition?.scale || 1})`,
-                                width: `${600 * PREVIEW_SCALE}px`,
-                                height: `${400 * PREVIEW_SCALE}px`,
+                                width: `${BASE_IMAGE_WIDTH * PREVIEW_SCALE}px`,
+                                height: `${BASE_IMAGE_HEIGHT * PREVIEW_SCALE}px`,
                                 zIndex: 20
                               }}
                               onDoubleClick={() => setEditingImageId(editingImageId === segment.id ? null : segment.id)}
                               onMouseDown={(e) => {
                                 if (editingImageId === segment.id) return; // 편집 모드에서는 드래그 비활성화
+                                e.preventDefault();
+                                e.stopPropagation();
                                 
-                                const rect = e.currentTarget.parentElement!.getBoundingClientRect();
+                                // 컨테이너 찾기 (실제 미리보기 컨테이너)
+                                const container = e.currentTarget.closest('.relative.bg-black');
+                                if (!container) return;
+                                
+                                const rect = container.getBoundingClientRect();
+                                const startX = e.clientX;
+                                const startY = e.clientY;
+                                const startPosX = segment.imagePosition?.x || 50;
+                                const startPosY = segment.imagePosition?.y || 50;
                                 
                                 const handleMouseMove = (e: MouseEvent) => {
-                                  const x = ((e.clientX - rect.left) / rect.width) * 100;
-                                  const y = ((e.clientY - rect.top) / rect.height) * 100;
+                                  const deltaX = ((e.clientX - startX) / rect.width) * 100;
+                                  const deltaY = ((e.clientY - startY) / rect.height) * 100;
+                                  
+                                  const newX = Math.max(5, Math.min(95, startPosX + deltaX));
+                                  const newY = Math.max(5, Math.min(95, startPosY + deltaY));
+                                  
                                   setSegments(prev => prev.map(s => 
                                     s.id === segment.id ? { 
                                       ...s, 
                                       imagePosition: {
-                                        x: Math.max(10, Math.min(90, x)), 
-                                        y: Math.max(10, Math.min(90, y)),
+                                        x: newX,
+                                        y: newY,
                                         scale: s.imagePosition?.scale || 1
                                       }
                                     } : s
@@ -2061,7 +3165,7 @@ export default function Home() {
                               {editingImageId === segment.id && (
                                 <>
                                   {/* 편집 모드 테두리 */}
-                                  <div className="absolute inset-0 border-2 border-blue-500 rounded-lg pointer-events-none"></div>
+                                  <div className="absolute inset-0 border-2 border-blue-500 pointer-events-none"></div>
                                   
                                   {/* 모서리 핸들들 */}
                                   <div 
@@ -2076,8 +3180,8 @@ export default function Home() {
                                         const deltaX = e.clientX - startX;
                                         const deltaY = e.clientY - startY;
                                         const avgDelta = (deltaX + deltaY) / 2;
-                                        const scaleChange = avgDelta / 150; // 더 세밀한 조정
-                                        const newScale = Math.max(0.1, Math.min(5, startScale + scaleChange));
+                                        const scaleChange = avgDelta / 100; // 더 민감하게 조정 (150 -> 100)
+                                        const newScale = Math.max(0.3, Math.min(8, startScale + scaleChange)); // 범위 확대 (0.1-5 -> 0.3-8)
                                         
                                         setSegments(prev => prev.map(s => 
                                           s.id === segment.id ? { 
@@ -2109,8 +3213,8 @@ export default function Home() {
                                         const deltaX = e.clientX - startX;
                                         const deltaY = -(e.clientY - startY); // 반대 방향
                                         const avgDelta = (deltaX + deltaY) / 2;
-                                        const scaleChange = avgDelta / 150;
-                                        const newScale = Math.max(0.1, Math.min(5, startScale + scaleChange));
+                                        const scaleChange = avgDelta / 100; // 더 민감하게 조정 (150 -> 100)
+                                        const newScale = Math.max(0.3, Math.min(8, startScale + scaleChange)); // 범위 확대 (0.1-5 -> 0.3-8)
                                         
                                         setSegments(prev => prev.map(s => 
                                           s.id === segment.id ? { 
@@ -2130,6 +3234,228 @@ export default function Home() {
                                     }}
                                   ></div>
                                   
+                                  {/* Southeast Handle (우하단) */}
+                                  <div 
+                                    className="absolute -bottom-2 -right-2 w-4 h-4 bg-blue-500 border-2 border-white rounded-full cursor-se-resize shadow-lg"
+                                    onMouseDown={(e) => {
+                                      e.stopPropagation();
+                                      const startX = e.clientX;
+                                      const startY = e.clientY;
+                                      const startScale = segment.imagePosition?.scale || 1;
+                                      
+                                      const handleMouseMove = (e: MouseEvent) => {
+                                        const deltaX = e.clientX - startX;
+                                        const deltaY = e.clientY - startY;
+                                        const avgDelta = (deltaX + deltaY) / 2;
+                                        const scaleChange = avgDelta / 100; // 더 민감하게 조정 (150 -> 100)
+                                        const newScale = Math.max(0.3, Math.min(8, startScale + scaleChange)); // 범위 확대 (0.1-5 -> 0.3-8)
+                                        
+                                        setSegments(prev => prev.map(s => 
+                                          s.id === segment.id ? { 
+                                            ...s, 
+                                            imagePosition: { 
+                                              ...s.imagePosition, 
+                                              scale: newScale, 
+                                              x: s.imagePosition?.x || 50, 
+                                              y: s.imagePosition?.y || 50 
+                                            }
+                                          } : s
+                                        ));
+                                      };
+                                      
+                                      const handleMouseUp = () => {
+                                        document.removeEventListener('mousemove', handleMouseMove);
+                                        document.removeEventListener('mouseup', handleMouseUp);
+                                      };
+                                      
+                                      document.addEventListener('mousemove', handleMouseMove);
+                                      document.addEventListener('mouseup', handleMouseUp);
+                                    }}
+                                  ></div>
+                                  
+                                  {/* Southwest Handle (좌하단) */}
+                                  <div 
+                                    className="absolute -bottom-2 -left-2 w-4 h-4 bg-blue-500 border-2 border-white rounded-full cursor-sw-resize shadow-lg"
+                                    onMouseDown={(e) => {
+                                      e.stopPropagation();
+                                      const startX = e.clientX;
+                                      const startY = e.clientY;
+                                      const startScale = segment.imagePosition?.scale || 1;
+                                      
+                                      const handleMouseMove = (e: MouseEvent) => {
+                                        const deltaX = -(e.clientX - startX);
+                                        const deltaY = e.clientY - startY;
+                                        const avgDelta = (deltaX + deltaY) / 2;
+                                        const scaleChange = avgDelta / 100; // 더 민감하게 조정 (150 -> 100)
+                                        const newScale = Math.max(0.3, Math.min(8, startScale + scaleChange)); // 범위 확대 (0.1-5 -> 0.3-8)
+                                        
+                                        setSegments(prev => prev.map(s => 
+                                          s.id === segment.id ? { 
+                                            ...s, 
+                                            imagePosition: { 
+                                              ...s.imagePosition, 
+                                              scale: newScale, 
+                                              x: s.imagePosition?.x || 50, 
+                                              y: s.imagePosition?.y || 50 
+                                            }
+                                          } : s
+                                        ));
+                                      };
+                                      
+                                      const handleMouseUp = () => {
+                                        document.removeEventListener('mousemove', handleMouseMove);
+                                        document.removeEventListener('mouseup', handleMouseUp);
+                                      };
+                                      
+                                      document.addEventListener('mousemove', handleMouseMove);
+                                      document.addEventListener('mouseup', handleMouseUp);
+                                    }}
+                                  ></div>
+                                  
+                                  {/* Top Edge Handle (상단 가장자리) */}
+                                  <div 
+                                    className="absolute -top-2 left-1/2 transform -translate-x-1/2 w-4 h-4 bg-blue-500 border-2 border-white rounded-full cursor-n-resize shadow-lg"
+                                    onMouseDown={(e) => {
+                                      e.stopPropagation();
+                                      const startY = e.clientY;
+                                      const startScale = segment.imagePosition?.scale || 1;
+                                      
+                                      const handleMouseMove = (e: MouseEvent) => {
+                                        const deltaY = -(e.clientY - startY);
+                                        const scaleChange = deltaY / 100;
+                                        const newScale = Math.max(0.3, Math.min(8, startScale + scaleChange));
+                                        
+                                        setSegments(prev => prev.map(s => 
+                                          s.id === segment.id ? { 
+                                            ...s, 
+                                            imagePosition: { 
+                                              ...s.imagePosition, 
+                                              scale: newScale, 
+                                              x: s.imagePosition?.x || 50, 
+                                              y: s.imagePosition?.y || 50 
+                                            }
+                                          } : s
+                                        ));
+                                      };
+                                      
+                                      const handleMouseUp = () => {
+                                        document.removeEventListener('mousemove', handleMouseMove);
+                                        document.removeEventListener('mouseup', handleMouseUp);
+                                      };
+                                      
+                                      document.addEventListener('mousemove', handleMouseMove);
+                                      document.addEventListener('mouseup', handleMouseUp);
+                                    }}
+                                  ></div>
+                                  
+                                  {/* Bottom Edge Handle (하단 가장자리) */}
+                                  <div 
+                                    className="absolute -bottom-2 left-1/2 transform -translate-x-1/2 w-4 h-4 bg-blue-500 border-2 border-white rounded-full cursor-s-resize shadow-lg"
+                                    onMouseDown={(e) => {
+                                      e.stopPropagation();
+                                      const startY = e.clientY;
+                                      const startScale = segment.imagePosition?.scale || 1;
+                                      
+                                      const handleMouseMove = (e: MouseEvent) => {
+                                        const deltaY = e.clientY - startY;
+                                        const scaleChange = deltaY / 100;
+                                        const newScale = Math.max(0.3, Math.min(8, startScale + scaleChange));
+                                        
+                                        setSegments(prev => prev.map(s => 
+                                          s.id === segment.id ? { 
+                                            ...s, 
+                                            imagePosition: { 
+                                              ...s.imagePosition, 
+                                              scale: newScale, 
+                                              x: s.imagePosition?.x || 50, 
+                                              y: s.imagePosition?.y || 50 
+                                            }
+                                          } : s
+                                        ));
+                                      };
+                                      
+                                      const handleMouseUp = () => {
+                                        document.removeEventListener('mousemove', handleMouseMove);
+                                        document.removeEventListener('mouseup', handleMouseUp);
+                                      };
+                                      
+                                      document.addEventListener('mousemove', handleMouseMove);
+                                      document.addEventListener('mouseup', handleMouseUp);
+                                    }}
+                                  ></div>
+                                  
+                                  {/* Left Edge Handle (좌측 가장자리) */}
+                                  <div 
+                                    className="absolute -left-2 top-1/2 transform -translate-y-1/2 w-4 h-4 bg-blue-500 border-2 border-white rounded-full cursor-w-resize shadow-lg"
+                                    onMouseDown={(e) => {
+                                      e.stopPropagation();
+                                      const startX = e.clientX;
+                                      const startScale = segment.imagePosition?.scale || 1;
+                                      
+                                      const handleMouseMove = (e: MouseEvent) => {
+                                        const deltaX = -(e.clientX - startX);
+                                        const scaleChange = deltaX / 100;
+                                        const newScale = Math.max(0.3, Math.min(8, startScale + scaleChange));
+                                        
+                                        setSegments(prev => prev.map(s => 
+                                          s.id === segment.id ? { 
+                                            ...s, 
+                                            imagePosition: { 
+                                              ...s.imagePosition, 
+                                              scale: newScale, 
+                                              x: s.imagePosition?.x || 50, 
+                                              y: s.imagePosition?.y || 50 
+                                            }
+                                          } : s
+                                        ));
+                                      };
+                                      
+                                      const handleMouseUp = () => {
+                                        document.removeEventListener('mousemove', handleMouseMove);
+                                        document.removeEventListener('mouseup', handleMouseUp);
+                                      };
+                                      
+                                      document.addEventListener('mousemove', handleMouseMove);
+                                      document.addEventListener('mouseup', handleMouseUp);
+                                    }}
+                                  ></div>
+                                  
+                                  {/* Right Edge Handle (우측 가장자리) */}
+                                  <div 
+                                    className="absolute -right-2 top-1/2 transform -translate-y-1/2 w-4 h-4 bg-blue-500 border-2 border-white rounded-full cursor-e-resize shadow-lg"
+                                    onMouseDown={(e) => {
+                                      e.stopPropagation();
+                                      const startX = e.clientX;
+                                      const startScale = segment.imagePosition?.scale || 1;
+                                      
+                                      const handleMouseMove = (e: MouseEvent) => {
+                                        const deltaX = e.clientX - startX;
+                                        const scaleChange = deltaX / 100;
+                                        const newScale = Math.max(0.3, Math.min(8, startScale + scaleChange));
+                                        
+                                        setSegments(prev => prev.map(s => 
+                                          s.id === segment.id ? { 
+                                            ...s, 
+                                            imagePosition: { 
+                                              ...s.imagePosition, 
+                                              scale: newScale, 
+                                              x: s.imagePosition?.x || 50, 
+                                              y: s.imagePosition?.y || 50 
+                                            }
+                                          } : s
+                                        ));
+                                      };
+                                      
+                                      const handleMouseUp = () => {
+                                        document.removeEventListener('mousemove', handleMouseMove);
+                                        document.removeEventListener('mouseup', handleMouseUp);
+                                      };
+                                      
+                                      document.addEventListener('mousemove', handleMouseMove);
+                                      document.addEventListener('mouseup', handleMouseUp);
+                                    }}
+                                  ></div>
+                                  
                                   {/* 편집 안내 */}
                                   <div className="absolute -top-10 left-1/2 transform -translate-x-1/2 bg-blue-600 text-white px-3 py-1 rounded text-xs whitespace-nowrap shadow-lg">
                                     ✨ 편집 모드 • 모서리 드래그로 크기 조절 • 스케일: {(segment.imagePosition?.scale || 1).toFixed(1)}x
@@ -2141,13 +3467,15 @@ export default function Home() {
                           
                           {/* 세그먼트 자막 */}
                           <div
-                            className="absolute text-white px-3 py-2 text-sm cursor-move select-none max-w-[90%] text-center font-bold"
+                            className="absolute px-3 py-2 cursor-move select-none max-w-[90%] text-center font-bold"
                             style={{
                               left: `${segment.subtitlePosition?.x || 50}%`,
                               top: `${segment.subtitlePosition?.y || 75}%`,
                               transform: 'translate(-50%, -50%)',
+                              color: segment.textColor || '#ffffff',
+                              fontSize: `${(segment.textSize || 36) * PREVIEW_SCALE}px`,
                               textShadow: `${3*PREVIEW_SCALE}px ${3*PREVIEW_SCALE}px ${6*PREVIEW_SCALE}px rgba(0,0,0,0.9)`,
-                            WebkitTextStroke: `${1*PREVIEW_SCALE}px #000000`,
+                              WebkitTextStroke: `${1*PREVIEW_SCALE}px #000000`,
                               zIndex: 35
                             }}
                             onMouseDown={(e) => {

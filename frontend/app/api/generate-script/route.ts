@@ -59,10 +59,10 @@ Topic: ${topic}
       wordCount: script.split(' ').length
     });
 
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('OpenAI API error:', error);
     
-    if (error?.code === 'insufficient_quota') {
+    if (error && typeof error === 'object' && 'code' in error && error.code === 'insufficient_quota') {
       return NextResponse.json(
         { error: 'OpenAI API quota exceeded' },
         { status: 429 }
